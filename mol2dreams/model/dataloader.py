@@ -1,5 +1,5 @@
 from torch.utils.data import Dataset, DataLoader
-
+import torch
 import random
 
 class MoleculeSpectrumDataset(Dataset):
@@ -50,3 +50,16 @@ class MoleculeSpectrumDataset(Dataset):
             'negatives': negative_embeddings
         }
         return sample
+
+    def collate_fn(batch):
+        anchors = torch.stack([item['anchor'] for item in batch], dim=0)
+
+        # num_positives and num_negatives should be consistent across the dataset
+        positives = torch.stack([item['positives'] for item in batch], dim=0)
+        negatives = torch.stack([item['negatives'] for item in batch], dim=0)
+
+        return {
+            'anchor': anchors,  # [B, E]
+            'positive': positives,  # [B, P, E]
+            'negatives': negatives  # [B, N, E]
+        }
