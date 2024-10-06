@@ -81,14 +81,31 @@ class CosineEmbeddingLoss(nn.Module):
         return loss
 
 class CombinedLoss(nn.Module):
-    def __init__(self, lambda_adv=0.5, lambda_con=0.5, temperature=0.07, margin=1.0, loss_type='InfoNCE'):
+    def __init__(self, lambda_adv=0.5, lambda_con=0.5, temperature=0.07, margin=1.0, loss_type='InfoNCE', use_logits=True):
+        """
+        Initializes the CombinedLoss module.
+
+        Args:
+            lambda_adv (float): Weight for adversarial loss.
+            lambda_con (float): Weight for contrastive loss.
+            temperature (float): Temperature parameter for InfoNCE.
+            margin (float): Margin parameter for Triplet and Cosine Embedding Losses.
+            loss_type (str): Type of contrastive loss to use ('InfoNCE', 'Triplet', 'CosineEmbedding').
+            use_logits (bool): If True, assumes discriminator outputs are logits and uses BCEWithLogitsLoss.
+                               If False, assumes outputs are probabilities and uses BCELoss.
+        """
         super(CombinedLoss, self).__init__()
         self.lambda_adv = lambda_adv
         self.lambda_con = lambda_con
         self.temperature = temperature
         self.margin = margin
         self.loss_type = loss_type
-        self.bce_loss = nn.BCELoss()
+
+        # Choose appropriate BCE loss based on discriminator output
+        if use_logits:
+            self.bce_loss = nn.BCEWithLogitsLoss()
+        else:
+            self.bce_loss = nn.BCELoss()
 
         if loss_type == 'InfoNCE':
             self.contrastive_loss_fn = InfoNCELoss(temperature=temperature)
@@ -122,10 +139,12 @@ class CombinedLoss(nn.Module):
         fake_labels = torch.zeros_like(D_fake)
 
         L_disc_real = self.bce_loss(D_real, real_labels)
+
+        # Detach needed, to avoid flow of gradient to molecular encoder
         L_disc_fake = self.bce_loss(D_fake.detach(), fake_labels)
         L_disc = L_disc_real + L_disc_fake
 
-        # Generator Adversarial Loss
+        # Generator Adversarial Loss, here we want to flow gradient to molecular encoder
         L_adv = self.bce_loss(D_fake, real_labels)
 
         # Contrastive Loss

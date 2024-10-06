@@ -51,6 +51,7 @@ class MoleculeSpectrumDataset(Dataset):
         }
         return sample
 
+    @staticmethod
     def collate_fn(batch):
         anchors = torch.stack([item['anchor'] for item in batch], dim=0)
 

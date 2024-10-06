@@ -9,7 +9,6 @@ class Discriminator(nn.Module):
             nn.Linear(256, 128),
             nn.LeakyReLU(0.2),
             nn.Linear(128, 1),
-            nn.Sigmoid()
         )
 
     def forward(self, x):
