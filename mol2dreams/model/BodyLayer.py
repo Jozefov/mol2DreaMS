@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch_geometric.nn import GCNConv, TransformerConv, GATConv, global_mean_pool as gap
+from torch_geometric.nn import global_mean_pool, global_max_pool, global_add_pool
 from mol2dreams.utils.layers import SKIPblock
 
 class BodyLayer(nn.Module):
@@ -11,135 +12,88 @@ class BodyLayer(nn.Module):
     def forward(self, x, batch, mass_shift):
         raise NotImplementedError("Body forward method not implemented")
 
-class CONV_BODY(BodyLayer):
-    def __init__(self, embedding_size_gnn, embedding_size, output_size):
-        super(CONV_BODY, self).__init__()
+# Before I used 7 layer of SKIPBLOCK and global_mean_pool
+class SKIPBLOCK_BODY(BodyLayer):
+    def __init__(self, embedding_size_gnn, embedding_size, num_skipblocks=7, pooling_fn='mean'):
+        super(SKIPBLOCK_BODY, self).__init__()
         torch.manual_seed(42)
+
+        self.pooling_fn = pooling_fn.lower()
+        if self.pooling_fn == 'mean':
+            self.pool = global_mean_pool
+        elif self.pooling_fn == 'max':
+            self.pool = global_max_pool
+        elif self.pooling_fn == 'add':
+            self.pool = global_add_pool
+        else:
+            raise ValueError(f"Unsupported pooling function: {pooling_fn}")
 
         self.bottleneck = nn.Linear(embedding_size_gnn, embedding_size)
 
-        self.skip1 = SKIPblock(embedding_size, embedding_size)
-        self.skip2 = SKIPblock(embedding_size, embedding_size)
-        self.skip3 = SKIPblock(embedding_size, embedding_size)
-        self.skip4 = SKIPblock(embedding_size, embedding_size)
-        self.skip5 = SKIPblock(embedding_size, embedding_size)
-        self.skip6 = SKIPblock(embedding_size, embedding_size)
-        self.skip7 = SKIPblock(embedding_size, embedding_size)
+        # Create skip blocks
+        self.skipblocks = nn.ModuleList([
+            SKIPblock(embedding_size, embedding_size) for _ in range(num_skipblocks)
+        ])
         self.relu_out_resnet = nn.ReLU()
 
-        # For this example, the output layers are placeholders
-        self.output_layer = nn.Linear(embedding_size, output_size)
-        self.relu_out = nn.ReLU()
-
-    def forward(self, x, batch, mass_shift):
+    def forward(self, x, batch):
         batch_index = batch.batch
-        hidden = gap(x, batch_index)
+        hidden = self.pool(x, batch_index)
         hidden = self.bottleneck(hidden)
 
-        hidden = self.skip1(hidden)
-        hidden = self.skip2(hidden)
-        hidden = self.skip3(hidden)
-        hidden = self.skip4(hidden)
-        hidden = self.skip5(hidden)
-        hidden = self.skip6(hidden)
-        hidden = self.skip7(hidden)
+        for skipblock in self.skipblocks:
+            hidden = skipblock(hidden)
 
         hidden = self.relu_out_resnet(hidden)
+        return hidden  # Shape: (batch_size, embedding_size)
 
-        # Output layer
-        out = self.output_layer(hidden)
-        out = self.relu_out(out)
+# Example of above network, but unfolded
+# class BIDIRECTIONAL_BODY(BodyLayer):
+#     def __init__(self, embedding_size_gnn, embedding_size, output_size, use_graph=True):
+#         super(BIDIRECTIONAL_BODY, self).__init__()
+#         torch.manual_seed(42)
+#
+#         self.use_graph = use_graph
+#
+#         self.bottleneck = nn.Linear(embedding_size_gnn, embedding_size)
+#
+#         self.skip1 = SKIPblock(embedding_size, embedding_size)
+#         self.skip2 = SKIPblock(embedding_size, embedding_size)
+#         self.skip3 = SKIPblock(embedding_size, embedding_size)
+#         self.skip4 = SKIPblock(embedding_size, embedding_size)
+#         self.skip5 = SKIPblock(embedding_size, embedding_size)
+#         self.skip6 = SKIPblock(embedding_size, embedding_size)
+#         self.skip7 = SKIPblock(embedding_size, embedding_size)
+#         self.relu_out_resnet = nn.ReLU()
+#
+#         # For this example, the output layers are placeholders
+#         self.output_layer = nn.Linear(embedding_size, output_size)
+#         self.relu_out = nn.ReLU()
+#
+#     def forward(self, x, batch, mass_shift):
+#         if self.use_graph:
+#             batch_index = batch.batch
+#             x = gap(x, batch_index)
+#         hidden = self.bottleneck(x)
+#
+#         hidden = self.skip1(hidden)
+#         hidden = self.skip2(hidden)
+#         hidden = self.skip3(hidden)
+#         hidden = self.skip4(hidden)
+#         hidden = self.skip5(hidden)
+#         hidden = self.skip6(hidden)
+#         hidden = self.skip7(hidden)
+#
+#         hidden = self.relu_out_resnet(hidden)
+#
+#         # Output layer
+#         out = self.output_layer(hidden)
+#         out = self.relu_out(out)
+#
+#         out = out.type(torch.float64)
+#         return out
 
-        out = out.type(torch.float64)
-        return out
-
-class TRANSFORMER_CONV_BODY(BodyLayer):
-    def __init__(self, embedding_size_gnn, embedding_size, output_size):
-        super(TRANSFORMER_CONV_BODY, self).__init__()
-        torch.manual_seed(42)
-
-        self.bottleneck = nn.Linear(embedding_size_gnn, embedding_size)
-
-        self.skip1 = SKIPblock(embedding_size, embedding_size)
-        self.skip2 = SKIPblock(embedding_size, embedding_size)
-        self.skip3 = SKIPblock(embedding_size, embedding_size)
-        self.skip4 = SKIPblock(embedding_size, embedding_size)
-        self.skip5 = SKIPblock(embedding_size, embedding_size)
-        self.skip6 = SKIPblock(embedding_size, embedding_size)
-        self.skip7 = SKIPblock(embedding_size, embedding_size)
-        self.relu_out_resnet = nn.ReLU()
-
-        # For this example, the output layers are placeholders
-        self.output_layer = nn.Linear(embedding_size, output_size)
-        self.relu_out = nn.ReLU()
-
-    def forward(self, x, batch, mass_shift):
-        batch_index = batch.batch
-        hidden = gap(x, batch_index)
-        hidden = self.bottleneck(hidden)
-
-        hidden = self.skip1(hidden)
-        hidden = self.skip2(hidden)
-        hidden = self.skip3(hidden)
-        hidden = self.skip4(hidden)
-        hidden = self.skip5(hidden)
-        hidden = self.skip6(hidden)
-        hidden = self.skip7(hidden)
-
-        hidden = self.relu_out_resnet(hidden)
-
-        # Output layer
-        out = self.output_layer(hidden)
-        out = self.relu_out(out)
-
-        out = out.type(torch.float64)
-        return out
-
-class BIDIRECTIONAL_BODY(BodyLayer):
-    def __init__(self, embedding_size_gnn, embedding_size, output_size, use_graph=True):
-        super(BIDIRECTIONAL_BODY, self).__init__()
-        torch.manual_seed(42)
-
-        self.use_graph = use_graph
-
-        self.bottleneck = nn.Linear(embedding_size_gnn, embedding_size)
-
-        self.skip1 = SKIPblock(embedding_size, embedding_size)
-        self.skip2 = SKIPblock(embedding_size, embedding_size)
-        self.skip3 = SKIPblock(embedding_size, embedding_size)
-        self.skip4 = SKIPblock(embedding_size, embedding_size)
-        self.skip5 = SKIPblock(embedding_size, embedding_size)
-        self.skip6 = SKIPblock(embedding_size, embedding_size)
-        self.skip7 = SKIPblock(embedding_size, embedding_size)
-        self.relu_out_resnet = nn.ReLU()
-
-        # For this example, the output layers are placeholders
-        self.output_layer = nn.Linear(embedding_size, output_size)
-        self.relu_out = nn.ReLU()
-
-    def forward(self, x, batch, mass_shift):
-        if self.use_graph:
-            batch_index = batch.batch
-            x = gap(x, batch_index)
-        hidden = self.bottleneck(x)
-
-        hidden = self.skip1(hidden)
-        hidden = self.skip2(hidden)
-        hidden = self.skip3(hidden)
-        hidden = self.skip4(hidden)
-        hidden = self.skip5(hidden)
-        hidden = self.skip6(hidden)
-        hidden = self.skip7(hidden)
-
-        hidden = self.relu_out_resnet(hidden)
-
-        # Output layer
-        out = self.output_layer(hidden)
-        out = self.relu_out(out)
-
-        out = out.type(torch.float64)
-        return out
-
+# I was building this part as
 class Regression_BODY(BodyLayer):
     def __init__(self, input_size, hidden_size, use_graph=True, dropout_rate=0.15):
         super(Regression_BODY, self).__init__()
