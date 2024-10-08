@@ -42,12 +42,12 @@ Run the following code from the command line.
 
 ``` shell
 # Download this repository
-git clone https://github.com/pluskal-lab/DreaMS.git
-cd DreaMS
+git clone https://github.com/Jozefov/mol2DreaMS.git
+cd mol2DreaMS
 
 # Create conda environment
-conda create -n dreams python==3.11.0 --yes
-conda activate dreams
+conda create -n mol2DreaMS python==3.11.0 --yes
+conda activate mol2DreaMS
 
 # Install DreaMS
 pip install -e .
