@@ -161,6 +161,6 @@ class Regression_BODY(BodyLayer):
         # Seventh layer and Output layer
         x = F.relu(self.bn7(self.fc7(x)))
         x = self.dropout(x)
-        out = self.fc8(x).type(torch.float64)
+        out = self.fc8(x)
 
         return out

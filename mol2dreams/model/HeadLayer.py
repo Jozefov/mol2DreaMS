@@ -46,4 +46,4 @@ class BidirectionalHeadLayer(HeadLayer):
         out = gate_hidden * forward_prediction_hidden + (1. - gate_hidden) * backward_prediction_hidden
         out = self.relu_out(out)
 
-        return out.type(torch.float64)
+        return out

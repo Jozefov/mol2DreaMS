@@ -15,3 +15,7 @@ class Mol2DreaMS(nn.Module):
         x = self.body_layer(x, batch)
         x = self.head_layer(x)
         return x
+
+    def count_parameters(self):
+        return sum(p.numel() for p in self.parameters() if p.requires_grad)
+    
