@@ -1,15 +1,137 @@
+import os
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
+from torch.utils.tensorboard import SummaryWriter
 from torch.utils.data import DataLoader
-from mol2dreams.model import Mol2DreaMS
+from mol2dreams.model.mol2dreams import Mol2DreaMS
 from mol2dreams.model.discriminator import Discriminator
-from mol2dreams.model.loss import CombinedLoss
+from mol2dreams.trainer.loss import CombinedLoss
 from mol2dreams.datasets.mocule_spectrum_dataset import MoleculeSpectrumDataset
 from mol2dreams.utils.gradient_penalty import compute_gradient_penalty
-from mol2dreams.utils.monitoring import setup_logger
+from mol2dreams.utils.metrics import cosine_similarity_metric
+
 
 class Trainer:
+    def __init__(self, model, loss_fn, optimizer, train_loader, val_loader=None, test_loader=None,
+                 device='cpu', log_dir='./logs', epochs=30, validate_every=1, save_every=1, save_best_only=True):
+        self.model = model.to(device)
+        self.loss_fn = loss_fn
+        self.optimizer = optimizer
+        self.train_loader = train_loader
+        self.val_loader = val_loader
+        self.test_loader = test_loader
+        self.device = device
+        self.log_dir = log_dir
+        self.epoch = epochs
+        self.writer = SummaryWriter(log_dir=log_dir)
+        self.validate_every = validate_every
+        self.save_every = save_every
+        self.save_best_only = save_best_only
+        self.best_val_loss = np.inf
+
+        # Create directory for saving models
+        os.makedirs(self.log_dir, exist_ok=True)
+
+    def train(self):
+        for epoch in range(self.epoch):
+            self.epoch = epoch
+            self.model.train()
+            total_loss = 0.0
+            total_cosine_sim = 0.0
+            for batch in self.train_loader:
+                batch = batch.to(self.device)
+                self.optimizer.zero_grad()
+                outputs = self.model(batch)
+                loss = self.loss_fn(outputs, batch.y)
+                loss.backward()
+                self.optimizer.step()
+                total_loss += loss.item()
+
+                # Compute cosine similarity
+                cosine_sim = cosine_similarity_metric(outputs, batch.y)
+                total_cosine_sim += cosine_sim
+
+            avg_loss = total_loss / len(self.train_loader)
+            avg_cosine_sim = total_cosine_sim / len(self.train_loader)
+            self.writer.add_scalar('Loss/train', avg_loss, epoch)
+            self.writer.add_scalar('CosineSimilarity/train', avg_cosine_sim, epoch)
+            print(f"Epoch [{epoch+1}/{self.epoch}], Loss: {avg_loss:.4f}, Cosine Sim: {avg_cosine_sim:.4f}")
+
+            # Validation
+            if self.val_loader and (epoch + 1) % self.validate_every == 0:
+                val_loss, val_cosine_sim = self.validate()
+                self.writer.add_scalar('Loss/val', val_loss, epoch)
+                self.writer.add_scalar('CosineSimilarity/val', val_cosine_sim, epoch)
+                print(f"Validation Loss: {val_loss:.4f}, Validation Cosine Sim: {val_cosine_sim:.4f}")
+
+                # Check if this is the best validation loss so far
+                if val_loss < self.best_val_loss:
+                    self.best_val_loss = val_loss
+                    self.save_checkpoint(best=True)
+
+            # Save model checkpoint
+            if (epoch + 1) % self.save_every == 0:
+                self.save_checkpoint()
+
+    def validate(self):
+        self.model.eval()
+        total_loss = 0.0
+        total_cosine_sim = 0.0
+        with torch.no_grad():
+            for batch in self.val_loader:
+                batch = batch.to(self.device)
+                outputs = self.model(batch)
+                loss = self.loss_fn(outputs, batch.y)
+                total_loss += loss.item()
+
+                # Compute cosine similarity
+                cosine_sim = cosine_similarity_metric(outputs, batch.y)
+                total_cosine_sim += cosine_sim
+
+        avg_loss = total_loss / len(self.val_loader)
+        avg_cosine_sim = total_cosine_sim / len(self.val_loader)
+        return avg_loss, avg_cosine_sim
+
+    def save_checkpoint(self, best=False):
+        if best and self.save_best_only:
+            # Remove previous best model if exists
+            best_model_path = os.path.join(self.log_dir, 'best_model.pt')
+            if os.path.exists(best_model_path):
+                os.remove(best_model_path)
+            # Save new best model
+            torch.save(self.model.state_dict(), best_model_path)
+            print(f"Best model saved at epoch {self.epoch+1} with validation loss {self.best_val_loss:.4f}")
+        else:
+            checkpoint_path = os.path.join(self.log_dir, f'model_epoch_{self.epoch+1}.pt')
+            torch.save(self.model.state_dict(), checkpoint_path)
+            print(f"Model checkpoint saved at {checkpoint_path}")
+
+    def test(self):
+        if self.test_loader is None:
+            print("Test loader is not provided.")
+            return
+        self.model.eval()
+        total_loss = 0.0
+        total_cosine_sim = 0.0
+        with torch.no_grad():
+            for batch in self.test_loader:
+                batch = batch.to(self.device)
+                outputs = self.model(batch)
+                loss = self.loss_fn(outputs, batch.y)
+                total_loss += loss.item()
+
+                # Compute cosine similarity
+                cosine_sim = cosine_similarity_metric(outputs, batch.y)
+                total_cosine_sim += cosine_sim
+
+        avg_loss = total_loss / len(self.test_loader)
+        avg_cosine_sim = total_cosine_sim / len(self.test_loader)
+        print(f"Test Loss: {avg_loss:.4f}, Test Cosine Sim: {avg_cosine_sim:.4f}")
+
+
+class ContrastiveTrainer:
     def __init__(self, config):
         """
         Initializes the Trainer.
@@ -41,7 +163,7 @@ class Trainer:
         self.train_loader, self.valid_loader, self.test_loader = self._create_dataloaders()
 
         # Logger
-        self.logger = setup_logger(config.get('log_file'))
+        # self.logger = setup_logger(config.get('log_file'))
 
     def _create_dataloaders(self):
         # Load your data here
