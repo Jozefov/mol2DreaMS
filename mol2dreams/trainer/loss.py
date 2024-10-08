@@ -2,6 +2,14 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+class MSELossWrapper(nn.Module):
+    def __init__(self):
+        super(MSELossWrapper, self).__init__()
+        self.loss_fn = nn.MSELoss()
+
+    def forward(self, outputs, targets):
+        return self.loss_fn(outputs, targets)
+
 class InfoNCELoss(torch.nn.Module):
     def __init__(self, temperature=0.07):
         super(InfoNCELoss, self).__init__()
