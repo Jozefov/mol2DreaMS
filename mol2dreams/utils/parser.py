@@ -5,6 +5,7 @@ import importlib
 import torch
 from torch import nn
 import torch.optim as optim
+from torch.utils.data import DataLoader
 from mol2dreams.model.mol2dreams import Mol2DreaMS
 from mol2dreams.trainer.trainer import Trainer
 
@@ -98,20 +99,30 @@ def build_optimizer_from_config(training_config, model_parameters):
     return optimizer
 
 def build_data_loaders_from_config(training_config):
-    def load_data_loader(path):
+    def load_dataset(path):
         try:
-            data_loader = torch.load(path)
-            return data_loader
+            dataset = torch.load(path)
+            return dataset
         except Exception as e:
-            raise ValueError(f"Could not load DataLoader from path {path}: {str(e)}")
+            raise ValueError(f"Could not load dataset from path {path}: {str(e)}")
 
-    train_loader_path = training_config['train_loader']['path']
-    val_loader_path = training_config.get('val_loader', {}).get('path')
-    test_loader_path = training_config.get('test_loader', {}).get('path')
+    train_dataset_path = training_config['train_loader']['path']
+    val_dataset_path = training_config.get('val_loader', {}).get('path')
+    test_dataset_path = training_config.get('test_loader', {}).get('path')
 
-    train_loader = load_data_loader(train_loader_path)
-    val_loader = load_data_loader(val_loader_path) if val_loader_path else None
-    test_loader = load_data_loader(test_loader_path) if test_loader_path else None
+    train_dataset = load_dataset(train_dataset_path)
+    val_dataset = load_dataset(val_dataset_path) if val_dataset_path else None
+    test_dataset = load_dataset(test_dataset_path) if test_dataset_path else None
+
+    batch_size = training_config.get('batch_size', 32)
+    num_workers = training_config.get('num_workers', 4)
+
+    # Adjust collate_fn for triplet dataset
+    collate_fn = getattr(train_dataset, 'collate_fn', None)
+
+    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=num_workers, collate_fn=collate_fn)
+    val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers, collate_fn=collate_fn) if val_dataset else None
+    test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers, collate_fn=collate_fn) if test_dataset else None
 
     return train_loader, val_loader, test_loader
 
@@ -150,22 +161,39 @@ def build_trainer_from_config(config):
     config_save_path = os.path.join(log_dir, 'config.yaml')
     with open(config_save_path, 'w') as file:
         yaml.dump(config, file)
+    trainer_type = config.get('trainer', {}).get('type', 'Trainer')
 
     # Initialize Trainer
-    trainer = Trainer(
-        model=model,
-        loss_fn=loss_fn,
-        optimizer=optimizer,
-        train_loader=train_loader,
-        val_loader=val_loader,
-        test_loader=test_loader,
-        device=device,
-        log_dir=log_dir,
-        epochs=num_epochs,
-        validate_every=validate_every,
-        save_every=save_every,
-        save_best_only=save_best_only
-    )
+    if trainer_type == 'TripletTrainer':
+        trainer = TripletTrainer(
+            model=model,
+            loss_fn=loss_fn,
+            optimizer=optimizer,
+            train_loader=train_loader,
+            val_loader=val_loader,
+            test_loader=test_loader,
+            device=device,
+            log_dir=log_dir,
+            epochs=num_epochs,
+            validate_every=validate_every,
+            save_every=save_every,
+            save_best_only=save_best_only
+        )
+    else:
+        trainer = Trainer(
+            model=model,
+            loss_fn=loss_fn,
+            optimizer=optimizer,
+            train_loader=train_loader,
+            val_loader=val_loader,
+            test_loader=test_loader,
+            device=device,
+            log_dir=log_dir,
+            epochs=num_epochs,
+            validate_every=validate_every,
+            save_every=save_every,
+            save_best_only=save_best_only
+        )
 
     return trainer
 
