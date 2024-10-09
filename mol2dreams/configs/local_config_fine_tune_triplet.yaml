@@ -1,0 +1,79 @@
+data_processing:
+  atom_config:
+    feature_attributes:
+      atom_symbol:
+        include_other: true
+        top_n_atoms: 42
+    features:
+      aromatic: true
+      atom_symbol: true
+      default_valence: true
+      formal_charge: true
+      hybridization: true
+      hydrogen_count: true
+      ring_size: true
+      total_valence: true
+  bond_config:
+    features:
+      bond_type: true
+      conjugated: true
+      in_ring: true
+      stereochemistry: false
+
+model:
+  pretrained_weights: "/Users/macbook/CODE/mol2DreaMS/data/logs/mol2dreams/best_model.pt"
+  input_layer:
+    type: 'CONV_GNN'
+    params:
+      node_features: 84
+      embedding_size_reduced: 128
+  body_layer:
+    type: 'SKIPBLOCK_BODY'
+    params:
+      embedding_size_gnn: 128
+      embedding_size: 256
+      num_skipblocks: 7
+      pooling_fn: 'mean'
+  head_layer:
+    type: 'BidirectionalHeadLayer'
+    params:
+      input_size: 256
+      output_size: 1024
+
+training:
+  trainer:
+    type: 'TripletTrainer'
+    params: {}  # Any additional trainer-specific parameters
+  num_epochs: 10
+  validate_every: 2
+  save_every: 2
+  save_best_only: true
+  device: 'cpu'  # Change to 'cuda' if using GPU
+  log_dir: '../../data/logs/mol2dreams'
+  loss_function:
+    type: 'TripletMarginLoss'
+    params:
+      margin: 1.0
+      p: 2
+  optimizer:
+    type: 'Adam'
+    params:
+      lr: 0.001
+  train_loader:
+    path: '../../data/data/triplet_dataset.pt'
+    dataset_type: 'TripletDataset'  # Specify the dataset class name
+    batch_size: 32
+    num_workers: 0
+    shuffle: true
+  val_loader:
+    path: '../../data/data/triplet_dataset.pt'
+    dataset_type: 'TripletDataset'
+    batch_size: 32
+    num_workers: 0
+    shuffle: false
+  test_loader:
+    path: '../../data/data/triplet_dataset.pt'
+    dataset_type: 'TripletDataset'
+    batch_size: 32
+    num_workers: 0
+    shuffle: false
