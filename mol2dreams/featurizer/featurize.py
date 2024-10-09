@@ -93,12 +93,13 @@ class MoleculeFeaturizer:
     def featurize_dataset(self, nist_data, include_extra_attr=True):
         """
         Featurizes an entire dataset of molecules, assigning embeddings and extra attributes.
+        IF embedding is not presented, it will be filled with tensor of zeroes
 
         Args:
             nist_data (list of dict): Each dict should contain 'smiles', 'embedding', and extra attributes.
             include_extra_attr (bool, optional): Whether to include additional attributes.
         Returns:
-            list of torch_geometric.data.Data: List of featurized graph data objects.
+            list of torch_geometric.data.Data or None: List of featurized graph data objects.
         """
         data_list = []
         total = len(nist_data)
@@ -111,14 +112,18 @@ class MoleculeFeaturizer:
             mol = Chem.MolFromSmiles(smiles)
             if mol is None:
                 print(f"Skipping invalid SMILES: {smiles}")
+                data_list.append(None)
                 continue
 
-            if include_extra_attr:
-                data = self.featurize_molecule(mol, embedding=embedding, extra_attrs=extra_attrs)
-            else:
-                data = self.featurize_molecule(mol, embedding=embedding, extra_attrs=None)
+            try:
+                if include_extra_attr:
+                    data = self.featurize_molecule(mol, embedding=embedding, extra_attrs=extra_attrs)
+                else:
+                    data = self.featurize_molecule(mol, embedding=embedding, extra_attrs=None)
+            except Exception as e:
+                print(f"Error featurizing molecule with SMILES {smiles}: {e}")
+                data = None
 
-            if data is not None:
-                data_list.append(data)
+            data_list.append(data)
 
         return data_list
