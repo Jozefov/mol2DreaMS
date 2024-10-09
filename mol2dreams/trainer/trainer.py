@@ -2,6 +2,7 @@ import os
 import numpy as np
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 import torch.optim as optim
 from torch.utils.tensorboard import SummaryWriter
 from torch.utils.data import DataLoader
@@ -130,6 +131,166 @@ class Trainer:
         avg_cosine_sim = total_cosine_sim / len(self.test_loader)
         print(f"Test Loss: {avg_loss:.4f}, Test Cosine Sim: {avg_cosine_sim:.4f}")
 
+class TripletTrainer(Trainer):
+    def __init__(self, model, loss_fn, optimizer, train_loader, val_loader=None, test_loader=None,
+                 device='cpu', log_dir='./logs', epochs=30, validate_every=1, save_every=1, save_best_only=True):
+        super(TripletTrainer, self).__init__(
+            model=model,
+            loss_fn=loss_fn,
+            optimizer=optimizer,
+            train_loader=train_loader,
+            val_loader=val_loader,
+            test_loader=test_loader,
+            device=device,
+            log_dir=log_dir,
+            epochs=epochs,
+            validate_every=validate_every,
+            save_every=save_every,
+            save_best_only=save_best_only
+        )
+
+    def train(self):
+        for epoch in range(self.epochs):
+            self.model.train()
+            total_loss = 0.0
+            total_pos_distance = 0.0
+            total_neg_distance = 0.0
+            for batch in self.train_loader:
+                if batch is None:
+                    continue  # Skip if batch is empty due to filtering
+
+                anchor_batch, positive_batch, negative_batch = batch
+
+                # Move batches to device
+                anchor_batch = anchor_batch.to(self.device)
+                positive_batch = positive_batch.to(self.device)
+                negative_batch = negative_batch.to(self.device)
+
+                self.optimizer.zero_grad()
+
+                # Forward pass
+                anchor_embeddings = self.model(anchor_batch)
+                positive_embeddings = self.model(positive_batch)
+                negative_embeddings = self.model(negative_batch)
+
+                # Compute the triplet loss
+                loss = self.loss_fn(anchor_embeddings, positive_embeddings, negative_embeddings)
+
+                # Backward pass and optimization
+                loss.backward()
+                self.optimizer.step()
+
+                total_loss += loss.item()
+
+                # Compute distances
+                pos_distances = F.pairwise_distance(anchor_embeddings, positive_embeddings)
+                neg_distances = F.pairwise_distance(anchor_embeddings, negative_embeddings)
+                total_pos_distance += pos_distances.mean().item()
+                total_neg_distance += neg_distances.mean().item()
+
+            avg_loss = total_loss / len(self.train_loader)
+            avg_pos_distance = total_pos_distance / len(self.train_loader)
+            avg_neg_distance = total_neg_distance / len(self.train_loader)
+            self.writer.add_scalar('Loss/train', avg_loss, epoch)
+            self.writer.add_scalar('Distance/pos_train', avg_pos_distance, epoch)
+            self.writer.add_scalar('Distance/neg_train', avg_neg_distance, epoch)
+            print(f"Epoch [{epoch+1}/{self.epochs}], Loss: {avg_loss:.4f}, Pos Dist: {avg_pos_distance:.4f}, Neg Dist: {avg_neg_distance:.4f}")
+
+            # Validation
+            if self.val_loader and (epoch + 1) % self.validate_every == 0:
+                val_loss, val_pos_dist, val_neg_dist = self.validate()
+                self.writer.add_scalar('Loss/val', val_loss, epoch)
+                self.writer.add_scalar('Distance/pos_val', val_pos_dist, epoch)
+                self.writer.add_scalar('Distance/neg_val', val_neg_dist, epoch)
+                print(f"Validation Loss: {val_loss:.4f}, Pos Dist: {val_pos_dist:.4f}, Neg Dist: {val_neg_dist:.4f}")
+
+                # Check if this is the best validation loss so far
+                if val_loss < self.best_val_loss:
+                    self.best_val_loss = val_loss
+                    self.save_checkpoint(best=True)
+
+            # Save model checkpoint
+            if (epoch + 1) % self.save_every == 0:
+                self.save_checkpoint()
+
+    def validate(self):
+        self.model.eval()
+        total_loss = 0.0
+        total_pos_distance = 0.0
+        total_neg_distance = 0.0
+        with torch.no_grad():
+            for batch in self.val_loader:
+                if batch is None:
+                    continue  # Skip if batch is empty due to filtering
+
+                anchor_batch, positive_batch, negative_batch = batch
+
+                # Move batches to device
+                anchor_batch = anchor_batch.to(self.device)
+                positive_batch = positive_batch.to(self.device)
+                negative_batch = negative_batch.to(self.device)
+
+                # Forward pass
+                anchor_embeddings = self.model(anchor_batch)
+                positive_embeddings = self.model(positive_batch)
+                negative_embeddings = self.model(negative_batch)
+
+                # Compute the triplet loss
+                loss = self.loss_fn(anchor_embeddings, positive_embeddings, negative_embeddings)
+
+                total_loss += loss.item()
+
+                # Compute distances
+                pos_distances = F.pairwise_distance(anchor_embeddings, positive_embeddings)
+                neg_distances = F.pairwise_distance(anchor_embeddings, negative_embeddings)
+                total_pos_distance += pos_distances.mean().item()
+                total_neg_distance += neg_distances.mean().item()
+
+        avg_loss = total_loss / len(self.val_loader)
+        avg_pos_distance = total_pos_distance / len(self.val_loader)
+        avg_neg_distance = total_neg_distance / len(self.val_loader)
+        return avg_loss, avg_pos_distance, avg_neg_distance
+
+    def test(self):
+        if self.test_loader is None:
+            print("Test loader is not provided.")
+            return
+        self.model.eval()
+        total_loss = 0.0
+        total_pos_distance = 0.0
+        total_neg_distance = 0.0
+        with torch.no_grad():
+            for batch in self.test_loader:
+                if batch is None:
+                    continue  # Skip if batch is empty due to filtering
+
+                anchor_batch, positive_batch, negative_batch = batch
+
+                # Move batches to device
+                anchor_batch = anchor_batch.to(self.device)
+                positive_batch = positive_batch.to(self.device)
+                negative_batch = negative_batch.to(self.device)
+
+                # Forward pass
+                anchor_embeddings = self.model(anchor_batch)
+                positive_embeddings = self.model(positive_batch)
+                negative_embeddings = self.model(negative_batch)
+
+                # Compute the triplet loss
+                loss = self.loss_fn(anchor_embeddings, positive_embeddings, negative_embeddings)
+
+                total_loss += loss.item()
+
+                # Compute distances
+                pos_distances = F.pairwise_distance(anchor_embeddings, positive_embeddings)
+                neg_distances = F.pairwise_distance(anchor_embeddings, negative_embeddings)
+                total_pos_distance += pos_distances.mean().item()
+                total_neg_distance += neg_distances.mean().item()
+
+        avg_loss = total_loss / len(self.test_loader)
+        avg_pos_distance = total_pos_distance / len(self.test_loader)
+        avg_neg_distance = total_neg_distance / len(self.test_loader)
+        print(f"Test Loss: {avg_loss:.4f}, Pos Dist: {avg_pos_distance:.4f}, Neg Dist: {avg_neg_distance:.4f}")
 
 class ContrastiveTrainer:
     def __init__(self, config):
