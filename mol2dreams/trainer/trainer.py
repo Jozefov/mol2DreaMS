@@ -25,7 +25,7 @@ class Trainer:
         self.test_loader = test_loader
         self.device = device
         self.log_dir = log_dir
-        self.epoch = epochs
+        self.epochs = epochs
         self.writer = SummaryWriter(log_dir=log_dir)
         self.validate_every = validate_every
         self.save_every = save_every
@@ -36,7 +36,7 @@ class Trainer:
         os.makedirs(self.log_dir, exist_ok=True)
 
     def train(self):
-        for epoch in range(self.epoch):
+        for epoch in range(self.epochs):
             self.epoch = epoch
             self.model.train()
             total_loss = 0.0
@@ -58,7 +58,7 @@ class Trainer:
             avg_cosine_sim = total_cosine_sim / len(self.train_loader)
             self.writer.add_scalar('Loss/train', avg_loss, epoch)
             self.writer.add_scalar('CosineSimilarity/train', avg_cosine_sim, epoch)
-            print(f"Epoch [{epoch+1}/{self.epoch}], Loss: {avg_loss:.4f}, Cosine Sim: {avg_cosine_sim:.4f}")
+            print(f"Epoch [{epoch+1}/{self.epochs}], Loss: {avg_loss:.4f}, Cosine Sim: {avg_cosine_sim:.4f}")
 
             # Validation
             if self.val_loader and (epoch + 1) % self.validate_every == 0:
@@ -151,6 +151,7 @@ class TripletTrainer(Trainer):
 
     def train(self):
         for epoch in range(self.epochs):
+            self.epoch = epoch
             self.model.train()
             total_loss = 0.0
             total_pos_distance = 0.0
