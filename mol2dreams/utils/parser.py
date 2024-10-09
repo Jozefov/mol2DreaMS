@@ -5,7 +5,8 @@ import importlib
 import torch
 from torch import nn
 import torch.optim as optim
-from torch.utils.data import DataLoader
+from torch_geometric.data import Data
+from torch.utils.data import DataLoader, Dataset
 from mol2dreams.model.mol2dreams import Mol2DreaMS
 from mol2dreams.trainer.trainer import Trainer
 
@@ -55,6 +56,17 @@ def build_model_from_config(config):
 
     # Assemble model
     model = Mol2DreaMS(input_layer, body_layer, head_layer)
+
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    # Load pretrained weights if provided
+    pretrained_weights_path = config.get('pretrained_weights', None)
+    if pretrained_weights_path:
+        try:
+            model.load_state_dict(torch.load(pretrained_weights_path, map_location=device))
+            print(f"Loaded pretrained weights from {pretrained_weights_path}")
+        except Exception as e:
+            raise ValueError(f"Failed to load pretrained weights from {pretrained_weights_path}: {e}")
+
     return model
 
 def get_class(module_name, class_name):
@@ -99,30 +111,65 @@ def build_optimizer_from_config(training_config, model_parameters):
     return optimizer
 
 def build_data_loaders_from_config(training_config):
-    def load_dataset(path):
+    def load_dataset(loader_config):
+        path = loader_config['path']
+        dataset_type = loader_config.get('dataset_type', None)
+
+        if dataset_type:
+            # Construct the module path
+            module_path = f"mol2dreams.datasets.{dataset_type}"
+            try:
+                dataset_class = get_class(module_path, dataset_type)
+            except (ImportError, AttributeError) as e:
+                raise ImportError(f"Could not import dataset class '{dataset_type}' from module '{module_path}': {e}")
+        else:
+            dataset_class = None
+
         try:
             dataset = torch.load(path)
-            return dataset
         except Exception as e:
-            raise ValueError(f"Could not load dataset from path {path}: {str(e)}")
+            raise ValueError(f"Could not load dataset from path {path}: {e}")
 
-    train_dataset_path = training_config['train_loader']['path']
-    val_dataset_path = training_config.get('val_loader', {}).get('path')
-    test_dataset_path = training_config.get('test_loader', {}).get('path')
+        # Handle the case where dataset is a list of Data objects
+        if isinstance(dataset, list) and all(isinstance(data, Data) for data in dataset):
+            if dataset_type == 'SimpleDataset':
+                # Use the SimpleDataset class from mol2dreams.datasets.SimpleDataset
+                module_path = "mol2dreams.datasets.SimpleDataset"
+                dataset_class = get_class(module_path, 'SimpleDataset')
+                dataset = dataset_class(dataset)
+            else:
+                raise ValueError("Dataset is a list of Data objects but 'dataset_type' is not 'SimpleDataset'.")
+        elif dataset_class and not isinstance(dataset, Dataset):
+            # If dataset is not an instance of Dataset but we have a dataset_class, reconstruct it
+            dataset = dataset_class(**dataset)
+        elif not isinstance(dataset, Dataset):
+            raise ValueError(f"Loaded dataset is not an instance of torch.utils.data.Dataset or list of Data objects.")
 
-    train_dataset = load_dataset(train_dataset_path)
-    val_dataset = load_dataset(val_dataset_path) if val_dataset_path else None
-    test_dataset = load_dataset(test_dataset_path) if test_dataset_path else None
+        return dataset
 
-    batch_size = training_config.get('batch_size', 32)
-    num_workers = training_config.get('num_workers', 4)
+    def create_data_loader(loader_config):
+        dataset = load_dataset(loader_config)
+        batch_size = loader_config.get('batch_size', 32)
+        num_workers = loader_config.get('num_workers', 4)
+        shuffle = loader_config.get('shuffle', False)
+        collate_fn = getattr(dataset, 'collate_fn', None)
 
-    # Adjust collate_fn for triplet dataset
-    collate_fn = getattr(train_dataset, 'collate_fn', None)
+        data_loader = DataLoader(
+            dataset,
+            batch_size=batch_size,
+            shuffle=shuffle,
+            num_workers=num_workers,
+            collate_fn=collate_fn
+        )
+        return data_loader
 
-    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=num_workers, collate_fn=collate_fn)
-    val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers, collate_fn=collate_fn) if val_dataset else None
-    test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers, collate_fn=collate_fn) if test_dataset else None
+    train_loader_config = training_config['train_loader']
+    val_loader_config = training_config.get('val_loader', {})
+    test_loader_config = training_config.get('test_loader', {})
+
+    train_loader = create_data_loader(train_loader_config)
+    val_loader = create_data_loader(val_loader_config) if val_loader_config else None
+    test_loader = create_data_loader(test_loader_config) if test_loader_config else None
 
     return train_loader, val_loader, test_loader
 
@@ -161,39 +208,33 @@ def build_trainer_from_config(config):
     config_save_path = os.path.join(log_dir, 'config.yaml')
     with open(config_save_path, 'w') as file:
         yaml.dump(config, file)
-    trainer_type = config.get('trainer', {}).get('type', 'Trainer')
+
+    # Get trainer type
+    trainer_type = config['training'].get('trainer', {}).get('type', 'Trainer')
+    trainer_params = config['training'].get('trainer', {}).get('params', {})
+
+    # Dynamically load the trainer class
+    try:
+        trainer_class = get_class('mol2dreams.trainer.trainer', trainer_type)
+    except (ImportError, AttributeError) as e:
+        raise ValueError(f"Unsupported trainer type: {trainer_type}") from e
 
     # Initialize Trainer
-    if trainer_type == 'TripletTrainer':
-        trainer = TripletTrainer(
-            model=model,
-            loss_fn=loss_fn,
-            optimizer=optimizer,
-            train_loader=train_loader,
-            val_loader=val_loader,
-            test_loader=test_loader,
-            device=device,
-            log_dir=log_dir,
-            epochs=num_epochs,
-            validate_every=validate_every,
-            save_every=save_every,
-            save_best_only=save_best_only
-        )
-    else:
-        trainer = Trainer(
-            model=model,
-            loss_fn=loss_fn,
-            optimizer=optimizer,
-            train_loader=train_loader,
-            val_loader=val_loader,
-            test_loader=test_loader,
-            device=device,
-            log_dir=log_dir,
-            epochs=num_epochs,
-            validate_every=validate_every,
-            save_every=save_every,
-            save_best_only=save_best_only
-        )
+    trainer = trainer_class(
+        model=model,
+        loss_fn=loss_fn,
+        optimizer=optimizer,
+        train_loader=train_loader,
+        val_loader=val_loader,
+        test_loader=test_loader,
+        device=device,
+        log_dir=log_dir,
+        epochs=num_epochs,
+        validate_every=validate_every,
+        save_every=save_every,
+        save_best_only=save_best_only,
+        **trainer_params  # Additional trainer parameters
+    )
 
     return trainer
 

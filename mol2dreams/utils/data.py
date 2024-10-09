@@ -153,3 +153,121 @@ def prepare_datasets(msdata, embs, splits=['train', 'val', 'test'],
             })
 
     return datasets
+
+
+def construct_triplets(df, examples_number=5):
+    # Filter the DataFrame
+    df_filtered = df[
+        (df['fold'] == 'train') &
+        (df['adduct'] == '[M+H]+') &
+        (df['collision_energy'] == 60.0)
+        ].reset_index(drop=True)
+
+    print(f"Filtered dataset size: {len(df_filtered)} spectra")
+
+    if len(df_filtered) == 0:
+        print("No spectra found after filtering. Exiting.")
+        return None
+
+    # Compute the 14-character prefix of the InChI key
+    df_filtered['inchikey_prefix'] = df_filtered['inchikey'].str[:14]
+
+    # Build mappings
+    # Map from InChI key prefixes to lists of identifiers
+    inchikey_to_identifiers = df_filtered.groupby('inchikey_prefix')['identifier'].apply(list).to_dict()
+
+    # Map from identifiers to InChI key prefixes and parent masses
+    identifier_to_inchikey = df_filtered.set_index('identifier')['inchikey_prefix'].to_dict()
+    identifier_to_parent_mass = df_filtered.set_index('identifier')['parent_mass'].to_dict()
+
+    # Build a DataFrame of parent masses and identifiers
+    mass_df = df_filtered[['identifier', 'parent_mass', 'inchikey_prefix']].copy()
+    mass_df = mass_df.sort_values('parent_mass').reset_index(drop=True)
+
+    # For each anchor, find positive and negative examples
+    data = []
+    for idx, row in df_filtered.iterrows():
+        anchor_id = row['identifier']
+        anchor_inchikey = row['inchikey_prefix']
+        anchor_parent_mass = row['parent_mass']
+        anchor_smiles = row['smiles']
+
+        # Find positive examples (same InChI key prefix, different identifier)
+        positive_ids = inchikey_to_identifiers[anchor_inchikey].copy()
+        positive_ids = [pid for pid in positive_ids if pid != anchor_id]
+
+        # Randomly select up to 5 positive examples
+        if len(positive_ids) > examples_number:
+            positive_ids = np.random.choice(positive_ids, examples_number, replace=False).tolist()
+
+        # Find negative examples (different InChI key prefix, parent mass within ±5 Da)
+        mass_lower = anchor_parent_mass - 5.0
+        mass_upper = anchor_parent_mass + 5.0
+
+        # Candidates within the mass range
+        mass_candidates = mass_df[
+            (mass_df['parent_mass'] >= mass_lower) &
+            (mass_df['parent_mass'] <= mass_upper)
+            ]
+
+        # Exclude entries with the same InChI key prefix and the anchor itself
+        negative_candidates = mass_candidates[
+            (mass_candidates['inchikey_prefix'] != anchor_inchikey) &
+            (mass_candidates['identifier'] != anchor_id)
+            ]
+
+        negative_ids = negative_candidates['identifier'].tolist()
+
+        # Randomly select up to 5 negative examples
+        if len(negative_ids) > examples_number:
+            negative_ids = np.random.choice(negative_ids, examples_number, replace=False).tolist()
+
+        # Append the results
+        data.append({
+            'anchor_smiles': anchor_smiles,
+            'anchor_id': anchor_id,
+            'positive_ids': positive_ids,
+            'negative_ids': negative_ids
+        })
+
+    # Convert the list to a DataFrame
+    triplets_df = pd.DataFrame(data)
+
+    print(f"Constructed triplets for {len(triplets_df)} anchors.")
+
+    return triplets_df
+
+
+def pre_featurize_molecules(triplets_df, identifier_to_smiles, identifier_to_embedding, featurizer):
+    # featurized_molecules, dictionary of identifiers in MassSpecGym with their processed molecules
+
+    all_identifiers = set(triplets_df['anchor_id'])
+    all_identifiers.update([id for ids in triplets_df['positive_ids'] for id in ids])
+    all_identifiers.update([id for ids in triplets_df['negative_ids'] for id in ids])
+
+    print(f"Total unique identifiers to featurize: {len(all_identifiers)}")
+
+    molecule_entries = []
+    for identifier in all_identifiers:
+        smiles = identifier_to_smiles[identifier]
+        embedding = identifier_to_embedding.get(identifier, None)
+        molecule_entries.append({'identifier': identifier, 'smiles': smiles, 'embedding': embedding})
+
+    print("Featurizing molecules...")
+    data_list = featurizer.featurize_dataset(molecule_entries)
+
+    featurized_molecules = {}
+    failed_identifiers = []
+
+    for entry, data in zip(molecule_entries, data_list):
+        identifier = entry['identifier']
+        if data is not None:
+            featurized_molecules[identifier] = data
+        else:
+            print(f"Failed to featurize molecule with identifier {identifier}")
+            failed_identifiers.append(identifier)
+
+    print(f"Featurized {len(featurized_molecules)} molecules out of {len(all_identifiers)}")
+
+    return featurized_molecules, failed_identifiers
+
