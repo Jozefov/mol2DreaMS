@@ -154,8 +154,8 @@ class TripletTrainer(Trainer):
             self.epoch = epoch
             self.model.train()
             total_loss = 0.0
-            total_pos_distance = 0.0
-            total_neg_distance = 0.0
+            total_pos_similarity = 0.0
+            total_neg_similarity = 0.0
             for batch in self.train_loader:
                 if batch is None:
                     continue  # Skip if batch is empty due to filtering
@@ -184,26 +184,27 @@ class TripletTrainer(Trainer):
                 total_loss += loss.item()
 
                 # Compute distances
-                pos_distances = F.pairwise_distance(anchor_embeddings, positive_embeddings)
-                neg_distances = F.pairwise_distance(anchor_embeddings, negative_embeddings)
-                total_pos_distance += pos_distances.mean().item()
-                total_neg_distance += neg_distances.mean().item()
+                pos_similarities = F.cosine_similarity(anchor_embeddings, positive_embeddings, dim=1)
+                neg_similarities = F.cosine_similarity(anchor_embeddings, negative_embeddings, dim=1)
+                total_pos_similarity += pos_similarities.mean().item()
+                total_neg_similarity += neg_similarities.mean().item()
 
             avg_loss = total_loss / len(self.train_loader)
-            avg_pos_distance = total_pos_distance / len(self.train_loader)
-            avg_neg_distance = total_neg_distance / len(self.train_loader)
+            avg_pos_similarity = total_pos_similarity / len(self.train_loader)
+            avg_neg_similarity = total_neg_similarity / len(self.train_loader)
             self.writer.add_scalar('Loss/train', avg_loss, epoch)
-            self.writer.add_scalar('Distance/pos_train', avg_pos_distance, epoch)
-            self.writer.add_scalar('Distance/neg_train', avg_neg_distance, epoch)
-            print(f"Epoch [{epoch+1}/{self.epochs}], Loss: {avg_loss:.4f}, Pos Dist: {avg_pos_distance:.4f}, Neg Dist: {avg_neg_distance:.4f}")
+            self.writer.add_scalar('CosineSimilarity/pos_train', avg_pos_similarity, epoch)
+            self.writer.add_scalar('CosineSimilarity/neg_train', avg_neg_similarity, epoch)
+            print(
+                f"Epoch [{epoch + 1}/{self.epochs}], Loss: {avg_loss:.4f}, Pos Sim: {avg_pos_similarity:.4f}, Neg Sim: {avg_neg_similarity:.4f}")
 
             # Validation
             if self.val_loader and (epoch + 1) % self.validate_every == 0:
-                val_loss, val_pos_dist, val_neg_dist = self.validate()
+                val_loss, val_pos_sim, val_neg_sim = self.validate()
                 self.writer.add_scalar('Loss/val', val_loss, epoch)
-                self.writer.add_scalar('Distance/pos_val', val_pos_dist, epoch)
-                self.writer.add_scalar('Distance/neg_val', val_neg_dist, epoch)
-                print(f"Validation Loss: {val_loss:.4f}, Pos Dist: {val_pos_dist:.4f}, Neg Dist: {val_neg_dist:.4f}")
+                self.writer.add_scalar('CosineSimilarity/pos_val', val_pos_sim, epoch)
+                self.writer.add_scalar('CosineSimilarity/neg_val', val_neg_sim, epoch)
+                print(f"Validation Loss: {val_loss:.4f}, Pos Sim: {val_pos_sim:.4f}, Neg Sim: {val_neg_sim:.4f}")
 
                 # Check if this is the best validation loss so far
                 if val_loss < self.best_val_loss:
@@ -217,8 +218,8 @@ class TripletTrainer(Trainer):
     def validate(self):
         self.model.eval()
         total_loss = 0.0
-        total_pos_distance = 0.0
-        total_neg_distance = 0.0
+        total_pos_similarity = 0.0
+        total_neg_similarity = 0.0
         with torch.no_grad():
             for batch in self.val_loader:
                 if batch is None:
@@ -241,16 +242,16 @@ class TripletTrainer(Trainer):
 
                 total_loss += loss.item()
 
-                # Compute distances
-                pos_distances = F.pairwise_distance(anchor_embeddings, positive_embeddings)
-                neg_distances = F.pairwise_distance(anchor_embeddings, negative_embeddings)
-                total_pos_distance += pos_distances.mean().item()
-                total_neg_distance += neg_distances.mean().item()
+                # Compute cosine similarity
+                pos_similarities = F.cosine_similarity(anchor_embeddings, positive_embeddings, dim=1)
+                neg_similarities = F.cosine_similarity(anchor_embeddings, negative_embeddings, dim=1)
+                total_pos_similarity += pos_similarities.mean().item()
+                total_neg_similarity += neg_similarities.mean().item()
 
         avg_loss = total_loss / len(self.val_loader)
-        avg_pos_distance = total_pos_distance / len(self.val_loader)
-        avg_neg_distance = total_neg_distance / len(self.val_loader)
-        return avg_loss, avg_pos_distance, avg_neg_distance
+        avg_pos_similarity = total_pos_similarity / len(self.val_loader)
+        avg_neg_similarity = total_neg_similarity / len(self.val_loader)
+        return avg_loss, avg_pos_similarity, avg_neg_similarity
 
     def test(self):
         if self.test_loader is None:
@@ -258,8 +259,8 @@ class TripletTrainer(Trainer):
             return
         self.model.eval()
         total_loss = 0.0
-        total_pos_distance = 0.0
-        total_neg_distance = 0.0
+        total_pos_similarity = 0.0
+        total_neg_similarity = 0.0
         with torch.no_grad():
             for batch in self.test_loader:
                 if batch is None:
@@ -283,15 +284,15 @@ class TripletTrainer(Trainer):
                 total_loss += loss.item()
 
                 # Compute distances
-                pos_distances = F.pairwise_distance(anchor_embeddings, positive_embeddings)
-                neg_distances = F.pairwise_distance(anchor_embeddings, negative_embeddings)
-                total_pos_distance += pos_distances.mean().item()
-                total_neg_distance += neg_distances.mean().item()
+                pos_similarities = F.cosine_similarity(anchor_embeddings, positive_embeddings, dim=1)
+                neg_similarities = F.cosine_similarity(anchor_embeddings, negative_embeddings, dim=1)
+                total_pos_similarity += pos_similarities.mean().item()
+                total_neg_similarity += neg_similarities.mean().item()
 
-        avg_loss = total_loss / len(self.test_loader)
-        avg_pos_distance = total_pos_distance / len(self.test_loader)
-        avg_neg_distance = total_neg_distance / len(self.test_loader)
-        print(f"Test Loss: {avg_loss:.4f}, Pos Dist: {avg_pos_distance:.4f}, Neg Dist: {avg_neg_distance:.4f}")
+        avg_loss = total_loss / len(self.val_loader)
+        avg_pos_similarity = total_pos_similarity / len(self.val_loader)
+        avg_neg_similarity = total_neg_similarity / len(self.val_loader)
+        print(f"Test Loss: {avg_loss:.4f}, Pos Cosine: {avg_pos_similarity:.4f}, Neg Cosine: {avg_neg_similarity:.4f}")
 
 class ContrastiveTrainer:
     def __init__(self, config):

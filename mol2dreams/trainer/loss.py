@@ -69,7 +69,7 @@ class TripletMarginLoss(nn.Module):
         return loss
 
 class TripletCosineLoss(nn.Module):
-    def __init__(self, margin=0.5):
+    def __init__(self, margin=0.1, normalize=False):
         """
         Initializes the TripletCosineLoss.
 
@@ -78,6 +78,7 @@ class TripletCosineLoss(nn.Module):
         """
         super(TripletCosineLoss, self).__init__()
         self.margin = margin
+        self.normalize = normalize
 
     def forward(self, anchor, positive, negative):
         """
@@ -92,9 +93,14 @@ class TripletCosineLoss(nn.Module):
             Tensor: Scalar tensor containing the triplet cosine loss.
         """
         # Normalize embeddings to unit vectors
-        anchor_norm = F.normalize(anchor, p=2, dim=1)
-        positive_norm = F.normalize(positive, p=2, dim=1)
-        negative_norm = F.normalize(negative, p=2, dim=1)
+        if self.normalize:
+            anchor_norm = F.normalize(anchor, p=2, dim=1)
+            positive_norm = F.normalize(positive, p=2, dim=1)
+            negative_norm = F.normalize(negative, p=2, dim=1)
+        else:
+            anchor_norm = anchor
+            positive_norm = positive
+            negative_norm = negative
 
         # Compute cosine similarities
         pos_sim = F.cosine_similarity(anchor_norm, positive_norm, dim=1)  # [batch_size]
