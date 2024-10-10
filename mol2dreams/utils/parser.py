@@ -8,7 +8,7 @@ import torch.optim as optim
 from torch_geometric.data import Data
 from torch.utils.data import DataLoader, Dataset
 from mol2dreams.model.mol2dreams import Mol2DreaMS
-from mol2dreams.trainer.trainer import Trainer
+from mol2dreams.model.discriminator import Discriminator
 
 def build_model_from_config(config):
     def get_class(module_name, class_name):
@@ -96,8 +96,7 @@ def build_loss_from_config(training_config):
     loss_fn = loss_class(**loss_params)
     return loss_fn
 
-def build_optimizer_from_config(training_config, model_parameters):
-    optimizer_config = training_config['optimizer']
+def build_optimizer_from_config(optimizer_config,  model_parameters):
     optimizer_type = optimizer_config['type']
     optimizer_params = optimizer_config.get('params', {})
 
@@ -186,7 +185,7 @@ def build_trainer_from_config(config):
     loss_fn = build_loss_from_config(config['training'])
 
     # Build optimizer
-    optimizer = build_optimizer_from_config(config['training'], model.parameters())
+    optimizer = build_optimizer_from_config(config['training'].get('optimizer', {}), model.parameters())
 
     # Load data loaders
     train_loader, val_loader, test_loader = build_data_loaders_from_config(config['training'])
@@ -209,9 +208,10 @@ def build_trainer_from_config(config):
     with open(config_save_path, 'w') as file:
         yaml.dump(config, file)
 
-    # Get trainer type
-    trainer_type = config['training'].get('trainer', {}).get('type', 'Trainer')
-    trainer_params = config['training'].get('trainer', {}).get('params', {})
+    # Get trainer type and parameters
+    trainer_config = config['training'].get('trainer', {})
+    trainer_type = trainer_config.get('type', 'Trainer')
+    trainer_params = trainer_config.get('params', {})
 
     # Dynamically load the trainer class
     try:
@@ -220,21 +220,56 @@ def build_trainer_from_config(config):
         raise ValueError(f"Unsupported trainer type: {trainer_type}") from e
 
     # Initialize Trainer
-    trainer = trainer_class(
-        model=model,
-        loss_fn=loss_fn,
-        optimizer=optimizer,
-        train_loader=train_loader,
-        val_loader=val_loader,
-        test_loader=test_loader,
-        device=device,
-        log_dir=log_dir,
-        epochs=num_epochs,
-        validate_every=validate_every,
-        save_every=save_every,
-        save_best_only=save_best_only,
-        **trainer_params  # Additional trainer parameters
-    )
+    if trainer_type == 'AdversarialTrainer':
+        # Build the discriminator
+        discriminator_config = trainer_params.get('discriminator', {})
+        embedding_dim = discriminator_config.get('embedding_dim', 0)
+        discriminator = Discriminator(embedding_dim=embedding_dim)
+        discriminator.to(device)
+
+        # Build discriminator optimizer
+        discriminator_optimizer = build_optimizer_from_config(
+            config['training'].get('discriminator_optimizer', {}),
+            discriminator.parameters()
+        )
+
+        trainer_params.pop('discriminator', None)
+
+        trainer = trainer_class(
+            model=model,
+            discriminator=discriminator,
+            discriminator_optimizer=discriminator_optimizer,
+            loss_fn=loss_fn,
+            optimizer=optimizer,
+            train_loader=train_loader,
+            val_loader=val_loader,
+            test_loader=test_loader,
+            device=device,
+            log_dir=log_dir,
+            epochs=num_epochs,
+            validate_every=validate_every,
+            save_every=save_every,
+            save_best_only=save_best_only,
+            **trainer_params
+        )
+    else:
+        trainer_params.pop('discriminator', None)
+
+        trainer = trainer_class(
+            model=model,
+            loss_fn=loss_fn,
+            optimizer=optimizer,
+            train_loader=train_loader,
+            val_loader=val_loader,
+            test_loader=test_loader,
+            device=device,
+            log_dir=log_dir,
+            epochs=num_epochs,
+            validate_every=validate_every,
+            save_every=save_every,
+            save_best_only=save_best_only,
+            **trainer_params
+        )
 
     return trainer
 
