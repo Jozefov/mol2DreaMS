@@ -112,23 +112,43 @@ class TripletCosineLoss(nn.Module):
         return loss
 
 class CosineEmbeddingLoss(nn.Module):
-    def __init__(self, margin=0.0, reduction='mean'):
+    def __init__(self, margin=0.0, reduction='mean', normalize=False):
+        """
+        Initializes the CosineEmbeddingLoss.
+
+        Args:
+            margin (float, optional): Margin value for dissimilar pairs. Default: 0.0
+            reduction (str, optional): Specifies the reduction to apply to the output
+            normalize (bool, optional): If normalize input before loss calculation. Default: False
+        """
         super(CosineEmbeddingLoss, self).__init__()
         self.loss_fn = nn.CosineEmbeddingLoss(margin=margin, reduction=reduction)
+        self.normalize = normalize
 
-    def forward(self, input1, input2, target):
+    def forward(self, input1, input2):
         """
         Compute the cosine embedding loss.
 
         Args:
             input1: Tensor of shape [batch_size, embedding_dim]
             input2: Tensor of shape [batch_size, embedding_dim]
-            target: Tensor of shape [batch_size], with 1 for similar pairs and -1 for dissimilar pairs
+            TODO: target: Tensor of shape [batch_size], with 1 for similar pairs and -1 for dissimilar pairs
 
         Returns:
             loss: Scalar tensor containing the cosine embedding loss.
         """
+
+        if self.normalize:
+            input1 = F.normalize(input1, p=2, dim=1)
+            input2 = F.normalize(input2, p=2, dim=1)
+
+        if input1.shape != input2.shape:
+            raise ValueError(f"Shape mismatch: input1 has shape {input1.shape}, input2 has shape {input2.shape}")
+
+        target = torch.ones(input1.size(0), device=input1.device)
+
         loss = self.loss_fn(input1, input2, target)
+
         return loss
 
 class CombinedLoss(nn.Module):
