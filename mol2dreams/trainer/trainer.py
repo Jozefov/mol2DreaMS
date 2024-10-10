@@ -333,7 +333,7 @@ class AdversarialTrainer(Trainer):
                     self.discriminator_optimizer.zero_grad()
 
                     # Real embeddings (E_S_real): positive embeddings passed through the model
-                    E_S_real = self.model(positive_batch).detach()
+                    E_S_real = positive_batch.y.detach()
                     D_real = self.discriminator(E_S_real)
 
                     # Fake embeddings (E_M): embeddings from the molecular encoder (anchor)
@@ -371,9 +371,10 @@ class AdversarialTrainer(Trainer):
                 # Compute D_fake for adversarial loss
                 if self.discriminator:
                     D_fake_for_generator = self.discriminator(E_M)
+                    real_labels = torch.ones_like(D_fake_for_generator)
                     L_adv = self.bce_loss(D_fake_for_generator, real_labels)
                 else:
-                    L_adv = torch.tensor(0.0)
+                    L_adv = torch.tensor(0.0).to(self.device)
 
                 # Compute triplet loss
                 pos_embeddings = self.model(positive_batch)
