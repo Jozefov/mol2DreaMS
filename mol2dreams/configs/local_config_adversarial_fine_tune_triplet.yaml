@@ -21,7 +21,7 @@ data_processing:
       stereochemistry: false
 
 model:
-  pretrained_weights: "/Users/macbook/CODE/mol2DreaMS/data/logs/mol2dreams/20241010_100301_mol2dreams/best_model.pt"
+  pretrained_weights: "/Users/macbook/CODE/mol2DreaMS/data/logs/mol2dreams/20241010_115915_mol2dreams/best_model.pt"
   input_layer:
     type: 'CONV_GNN'
     params:
