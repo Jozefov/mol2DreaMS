@@ -398,8 +398,8 @@ class AdversarialTrainer(Trainer):
                     print(f'Epoch [{epoch+1}/{self.epochs}], Batch [{batch_idx}/{len(self.train_loader)}], '
                           f'Total Loss: {total_loss_batch.item():.4f}, '
                           f'Triplet Loss: {L_triplet.item():.4f}, '
-                          f'Adv Loss: {L_adv.item():.4f}, '
-                          f'Disc Loss: {L_disc.item():.4f}')
+                          f'Adversarial Loss: {L_adv.item():.4f}, '
+                          f'Discriminator Loss: {L_disc.item():.4f}')
 
             # Compute average losses
             avg_total_loss = total_loss / len(self.train_loader)
@@ -416,8 +416,8 @@ class AdversarialTrainer(Trainer):
             print(f'Epoch [{epoch+1}/{self.epochs}] Completed. '
                   f'Avg Total Loss: {avg_total_loss:.4f}, '
                   f'Avg Triplet Loss: {avg_triplet_loss:.4f}, '
-                  f'Avg Adv Loss: {avg_adv_loss:.4f}, '
-                  f'Avg Disc Loss: {avg_disc_loss:.4f}')
+                  f'Avg Adversarial Loss: {avg_adv_loss:.4f}, '
+                  f'Avg Discriminator Loss: {avg_disc_loss:.4f}')
 
             # Validation
             if self.val_loader and (epoch + 1) % self.validate_every == 0:
@@ -491,7 +491,7 @@ class AdversarialTrainer(Trainer):
         self.writer.add_scalar('CosineSimilarity/neg_val', avg_neg_similarity, self.epoch)
 
         print(f'Validation Loss: {avg_loss:.4f}, Triplet Loss: {avg_triplet_loss:.4f}, '
-              f'Adv Loss: {avg_adv_loss:.4f}, Pos Sim: {avg_pos_similarity:.4f}, '
+              f'Adversarial Loss: {avg_adv_loss:.4f}, Pos Sim: {avg_pos_similarity:.4f}, '
               f'Neg Sim: {avg_neg_similarity:.4f}')
         return avg_loss
 
@@ -556,7 +556,7 @@ class AdversarialTrainer(Trainer):
         self.writer.add_scalar('CosineSimilarity/neg_test', avg_neg_similarity, self.epoch)
 
         print(f'Test Loss: {avg_loss:.4f}, Triplet Loss: {avg_triplet_loss:.4f}, '
-              f'Adv Loss: {avg_adv_loss:.4f}, Pos Sim: {avg_pos_similarity:.4f}, '
+              f'Adversarial Loss: {avg_adv_loss:.4f}, Pos Sim: {avg_pos_similarity:.4f}, '
               f'Neg Sim: {avg_neg_similarity:.4f}')
 
 # class ContrastiveTrainer:
