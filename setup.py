@@ -23,7 +23,7 @@ setup(
         "pandas==2.2.3",
         "pyarrow==15.0.2",
         "h5py==3.11.0",
-        "rdkit==2023.9.5",
+        "rdkit==2023.9.6",
         "umap-learn==0.5.6",
         "seaborn==0.13.2",
         "plotly==5.20.0",
