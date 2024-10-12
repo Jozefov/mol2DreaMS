@@ -13,7 +13,6 @@ from mol2dreams.datasets.mocule_spectrum_dataset import MoleculeSpectrumDataset
 from mol2dreams.utils.gradient_penalty import compute_gradient_penalty
 from mol2dreams.utils.metrics import cosine_similarity_metric
 
-
 class Trainer:
     def __init__(self, model, loss_fn, optimizer, train_loader, val_loader=None, test_loader=None,
                  device='cpu', log_dir='./logs', epochs=30, validate_every=1, save_every=1, save_best_only=True):

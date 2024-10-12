@@ -16,6 +16,17 @@ class IdentityHead(HeadLayer):
     def forward(self, x):
         return x  # Pass-through for now
 
+class ProjectionHead(HeadLayer):
+    def __init__(self, input_size, output_size):
+        super(ProjectionHead, self).__init__()
+        self.forward_prediction = nn.Linear(input_size, output_size)
+        self.relu_out = nn.ReLU()
+
+    def forward(self, x):
+        x = self.forward_prediction(x)
+        x = self.relu_out(x)
+        return x
+
 class BidirectionalHeadLayer(HeadLayer):
     def __init__(self, input_size, output_size):
         super(BidirectionalHeadLayer, self).__init__()
