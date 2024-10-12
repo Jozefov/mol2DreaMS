@@ -20,11 +20,11 @@ class ProjectionHead(HeadLayer):
     def __init__(self, input_size, output_size):
         super(ProjectionHead, self).__init__()
         self.forward_prediction = nn.Linear(input_size, output_size)
-        self.relu_out = nn.ReLU()
+
 
     def forward(self, x):
         x = self.forward_prediction(x)
-        x = self.relu_out(x)
+
         return x
 
 class BidirectionalHeadLayer(HeadLayer):
@@ -36,7 +36,7 @@ class BidirectionalHeadLayer(HeadLayer):
         self.backward_prediction = nn.Linear(input_size, output_size)
         self.gate = nn.Linear(input_size, output_size)
 
-        self.relu_out = nn.ReLU()
+
 
     def forward(self, x):
         # x: tensor of shape (batch_size, input_size)
@@ -55,6 +55,6 @@ class BidirectionalHeadLayer(HeadLayer):
 
         # Combine forward and backward predictions
         out = gate_hidden * forward_prediction_hidden + (1. - gate_hidden) * backward_prediction_hidden
-        out = self.relu_out(out)
+
 
         return out

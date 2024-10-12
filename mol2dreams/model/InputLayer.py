@@ -19,15 +19,15 @@ class CONV_GNN(InputLayer):
 
         # GCN layers
         self.initial_conv = GCNConv(node_features, embedding_size_reduced)
-        self.reluinit = nn.ReLU()
+        self.reluinit = nn.LeakyReLU(negative_slope=0.1)
         self.conv1 = GCNConv(embedding_size_reduced, embedding_size_reduced)
-        self.reluconv1 = nn.ReLU()
+        self.reluconv1 = nn.LeakyReLU(negative_slope=0.1)
         self.conv2 = GCNConv(embedding_size_reduced, embedding_size_reduced)
-        self.reluconv2 = nn.ReLU()
+        self.reluconv2 = nn.LeakyReLU(negative_slope=0.1)
         self.conv3 = GCNConv(embedding_size_reduced, embedding_size_reduced)
-        self.reluconv3 = nn.ReLU()
+        self.reluconv3 = nn.LeakyReLU(negative_slope=0.1)
         self.conv4 = GCNConv(embedding_size_reduced, embedding_size_reduced)
-        self.reluconv4 = nn.ReLU()
+        self.reluconv4 = nn.LeakyReLU(negative_slope=0.1)
 
     def forward(self, batch):
         x = batch.x.float()
@@ -55,19 +55,19 @@ class TRANSFORMER_CONV(InputLayer):
         # Transformer Conv layers
         self.initial_conv = TransformerConv(node_features, embedding_size_reduced, heads=heads_num, beta=True,
                                             dropout=dropout, edge_dim=edge_features)
-        self.reluinit = nn.ReLU()
+        self.reluinit = nn.LeakyReLU(negative_slope=0.1)
         self.conv1 = TransformerConv(embedding_size_reduced * heads_num, embedding_size_reduced, heads=heads_num,
                                      beta=True, dropout=dropout, edge_dim=edge_features)
-        self.reluconv1 = nn.ReLU()
+        self.reluconv1 = nn.LeakyReLU(negative_slope=0.1)
         self.conv2 = TransformerConv(embedding_size_reduced * heads_num, embedding_size_reduced, heads=heads_num,
                                      beta=True, dropout=dropout, edge_dim=edge_features)
-        self.reluconv2 = nn.ReLU()
+        self.reluconv2 = nn.LeakyReLU(negative_slope=0.1)
         self.conv3 = TransformerConv(embedding_size_reduced * heads_num, embedding_size_reduced, heads=heads_num,
                                      beta=True, dropout=dropout)
-        self.reluconv3 = nn.ReLU()
+        self.reluconv3 = nn.LeakyReLU(negative_slope=0.1)
         self.conv4 = TransformerConv(embedding_size_reduced * heads_num, embedding_size_reduced, concat=False,
                                      heads=heads_num, beta=True, dropout=dropout)
-        self.reluconv4 = nn.ReLU()
+        self.reluconv4 = nn.LeakyReLU(negative_slope=0.1)
 
     def forward(self, batch):
         x = batch.x.float()
@@ -104,7 +104,7 @@ class GAT(InputLayer):
         self.skipgat4 = SKIPGAT(embedding_size_reduced * heads_num, embedding_size_reduced, heads=heads_num,
                                 dropout_rate=dropout)
         self.mean_conv = GATConv(embedding_size_reduced * heads_num, embedding_size_reduced, heads=heads_num, concat=False)
-        self.mean_relu = nn.ReLU()
+        self.mean_relu = nn.LeakyReLU(negative_slope=0.1)
 
     def forward(self, batch):
         x = batch.x.float()

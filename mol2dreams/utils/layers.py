@@ -5,13 +5,13 @@ class SKIPGAT(nn.Module):
     def __init__(self, in_features, hidden_features, heads, edge_features=None, use_dropout=True, dropout_rate=0.1):
         super(SKIPGAT, self).__init__()
 
-        self.relu1 = nn.ReLU()
+        self.relu1 = nn.LeakyReLU(negative_slope=0.1)
         if use_dropout:
             self.conv1 = GATConv(in_features, hidden_features, heads=heads, dropout=dropout_rate, edge_dim=edge_features)
         else:
             self.conv1 = GATConv(in_features, hidden_features, heads=heads, edge_dim=edge_features)
 
-        self.relu2 = nn.ReLU()
+        self.relu2 = nn.LeakyReLU(negative_slope=0.1)
         if use_dropout:
             self.conv2 = GATConv(hidden_features * heads, int(in_features / heads), heads=heads, dropout=dropout_rate,
                                  edge_dim=edge_features)
@@ -34,14 +34,14 @@ class SKIPblock(nn.Module):
         super(SKIPblock, self).__init__()
 
         self.batchNorm1 = nn.BatchNorm1d(in_features)
-        self.relu1 = nn.ReLU()
+        self.relu1 = nn.LeakyReLU(negative_slope=0.1)
         if use_dropout:
             self.dropout1 = nn.Dropout(dropout_rate)
         self.hidden1 = nn.utils.weight_norm(nn.Linear(in_features, int(hidden_features * bottleneck_factor)),
                                             name='weight', dim=0)
 
         self.batchNorm2 = nn.BatchNorm1d(int(hidden_features * bottleneck_factor))
-        self.relu2 = nn.ReLU()
+        self.relu2 = nn.LeakyReLU(negative_slope=0.1)
         if use_dropout:
             self.dropout2 = nn.Dropout(dropout_rate)
         self.hidden2 = nn.utils.weight_norm(nn.Linear(int(hidden_features * bottleneck_factor), in_features),

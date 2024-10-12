@@ -34,7 +34,7 @@ class SKIPBLOCK_BODY(BodyLayer):
         self.skipblocks = nn.ModuleList([
             SKIPblock(embedding_size, embedding_size) for _ in range(num_skipblocks)
         ])
-        self.relu_out_resnet = nn.ReLU()
+        self.relu_out_resnet = nn.LeakyReLU(negative_slope=0.1)
 
     def forward(self, x, batch):
         batch_index = batch.batch
@@ -103,6 +103,7 @@ class Regression_BODY(BodyLayer):
         self.dropout_rate = dropout_rate
 
         # Define layers
+        self.relu = nn.LeakyReLU(negative_slope=0.1)
         self.fc1 = nn.Linear(input_size, hidden_size)
         self.bn1 = nn.BatchNorm1d(hidden_size)
         self.fc2 = nn.Linear(hidden_size, hidden_size)
@@ -134,32 +135,32 @@ class Regression_BODY(BodyLayer):
 
         # First layer
         identity = x
-        x = F.relu(self.bn1(self.fc1(x)))
+        x = self.relu(self.bn1(self.fc1(x)))
         x = self.dropout(x)
 
         # Second layer with skip connection
         identity = self.proj1(identity)
-        x = F.relu(self.bn2(self.fc2(x)))
+        x = self.relu(self.bn2(self.fc2(x)))
         x = self.dropout(x)
         x += identity  # Skip connection
 
         # Third and Fourth layers
         identity = x
-        x = F.relu(self.bn3(self.fc3(x)))
+        x = self.relu(self.bn3(self.fc3(x)))
         x = self.dropout(x)
-        x = F.relu(self.bn4(self.fc4(x)))
+        x = self.relu(self.bn4(self.fc4(x)))
         x = self.dropout(x)
 
         # Fifth and Sixth layers with skip connection
         identity = self.proj2(identity)
-        x = F.relu(self.bn5(self.fc5(x)))
+        x = self.relu(self.bn5(self.fc5(x)))
         x = self.dropout(x)
-        x = F.relu(self.bn6(self.fc6(x)))
+        x = self.relu(self.bn6(self.fc6(x)))
         x = self.dropout(x)
         x += identity  # Skip connection
 
         # Seventh layer and Output layer
-        x = F.relu(self.bn7(self.fc7(x)))
+        x = self.relu(self.bn7(self.fc7(x)))
         x = self.dropout(x)
         out = self.fc8(x)
 
