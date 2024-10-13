@@ -58,16 +58,21 @@ class Trainer:
 
             avg_loss = total_loss / len(self.train_loader)
             avg_cosine_sim = total_cosine_sim / len(self.train_loader)
+            avg_cosine_sim_normalized = total_cosine_sim_normalized / len(self.train_loader)
             self.writer.add_scalar('Loss/train', avg_loss, epoch)
             self.writer.add_scalar('CosineSimilarity/train', avg_cosine_sim, epoch)
-            print(f"Epoch [{epoch+1}/{self.epochs}], Loss: {avg_loss:.4f}, Cosine Sim: {avg_cosine_sim:.4f}")
+            self.writer.add_scalar('CosineSimilarityNormalized/train', avg_cosine_sim_normalized, epoch)
+            print(f"Epoch [{epoch+1}/{self.epochs}], Loss: {avg_loss:.4f}, Cosine Sim: {avg_cosine_sim:.4f},"
+                  f"Cosine Sim Normalized: {avg_cosine_sim_normalized:.4f}")
 
             # Validation
             if self.val_loader and (epoch + 1) % self.validate_every == 0:
-                val_loss, val_cosine_sim = self.validate()
+                val_loss, val_cosine_sim, val_cosine_sim_normalized = self.validate()
                 self.writer.add_scalar('Loss/val', val_loss, epoch)
                 self.writer.add_scalar('CosineSimilarity/val', val_cosine_sim, epoch)
-                print(f"Validation Loss: {val_loss:.4f}, Validation Cosine Sim: {val_cosine_sim:.4f}")
+                self.writer.add_scalar('CosineSimilarityNormalized/train', val_cosine_sim_normalized, epoch)
+                print(f"Validation Loss: {val_loss:.4f}, Validation Cosine Sim: {val_cosine_sim:.4f},"
+                      f"Validation Cosine Sim Normalized: {val_cosine_sim_normalized:.4f}")
 
                 # Check if this is the best validation loss so far
                 if val_loss < self.best_val_loss:
@@ -97,7 +102,8 @@ class Trainer:
 
         avg_loss = total_loss / len(self.val_loader)
         avg_cosine_sim = total_cosine_sim / len(self.val_loader)
-        return avg_loss, avg_cosine_sim
+        avg_cosine_sim_normalized = total_cosine_sim_normalized / len(self.val_loader)
+        return avg_loss, avg_cosine_sim, avg_cosine_sim_normalized
 
     def save_checkpoint(self, best=False):
         if best and self.save_best_only:
@@ -135,7 +141,9 @@ class Trainer:
 
         avg_loss = total_loss / len(self.test_loader)
         avg_cosine_sim = total_cosine_sim / len(self.test_loader)
-        print(f"Test Loss: {avg_loss:.4f}, Test Cosine Sim: {avg_cosine_sim:.4f}")
+        avg_cosine_sim_normalized = total_cosine_sim_normalized / len(self.test_loader)
+        print(f"Test Loss: {avg_loss:.4f}, Test Cosine Sim: {avg_cosine_sim:.4f},"
+              f"Test Cosine Sim Normalized: {avg_cosine_sim_normalized:.4f}")
 
 class TripletTrainer(Trainer):
     def __init__(self, model, loss_fn, optimizer, train_loader, val_loader=None, test_loader=None,
