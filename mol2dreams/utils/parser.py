@@ -23,6 +23,7 @@ def build_model_from_config(config):
     # Define module paths for each layer type
     layer_modules = {
         'input_layers': 'mol2dreams.model.InputLayer',
+        'global_input_layers': 'mol2dreams.model.GlobalInputLayer',
         'body_layers': 'mol2dreams.model.BodyLayer',
         'head_layers': 'mol2dreams.model.HeadLayer'
     }
@@ -35,6 +36,17 @@ def build_model_from_config(config):
         input_layer = input_layer_class(**input_layer_params)
     except (ImportError, AttributeError) as e:
         raise ValueError(f"Unsupported input layer type: {input_layer_type}") from e
+
+    # Global Input Layer (if specified)
+    global_input_layer = None
+    if 'global_input_layer' in config['model']:
+        global_input_layer_type = config['model']['global_input_layer']['type']
+        global_input_layer_params = config['model']['global_input_layer']['params']
+        try:
+            global_input_layer_class = get_class(layer_modules['global_input_layers'], global_input_layer_type)
+            global_input_layer = global_input_layer_class(**global_input_layer_params)
+        except (ImportError, AttributeError) as e:
+            raise ValueError(f"Unsupported global input layer type: {global_input_layer_type}") from e
 
     # Body Layer
     body_layer_type = config['body_layer']['type']
@@ -54,8 +66,8 @@ def build_model_from_config(config):
     except (ImportError, AttributeError) as e:
         raise ValueError(f"Unsupported head layer type: {head_layer_type}") from e
 
-    # Assemble model
-    model = Mol2DreaMS(input_layer, body_layer, head_layer)
+    # Assemble the model
+    model = Mol2DreaMS(input_layer=input_layer, global_input_layer=global_input_layer, body_layer=body_layer, head_layer=head_layer)
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     # Load pretrained weights if provided
