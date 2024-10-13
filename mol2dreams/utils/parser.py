@@ -39,9 +39,9 @@ def build_model_from_config(config):
 
     # Global Input Layer (if specified)
     global_input_layer = None
-    if 'global_input_layer' in config['model']:
-        global_input_layer_type = config['model']['global_input_layer']['type']
-        global_input_layer_params = config['model']['global_input_layer']['params']
+    if 'global_input_layer' in config:
+        global_input_layer_type = config['global_input_layer']['type']
+        global_input_layer_params = config['global_input_layer']['params']
         try:
             global_input_layer_class = get_class(layer_modules['global_input_layers'], global_input_layer_type)
             global_input_layer = global_input_layer_class(**global_input_layer_params)
