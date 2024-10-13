@@ -14,9 +14,27 @@ class BodyLayer(nn.Module):
 
 # Before I used 7 layer of SKIPBLOCK and global_mean_pool
 class SKIPBLOCK_BODY(BodyLayer):
-    def __init__(self, embedding_size_gnn, embedding_size, num_skipblocks=7, pooling_fn='mean'):
+    def __init__(self, embedding_size_gnn,
+                 embedding_size, num_skipblocks=7,
+                 pooling_fn='mean',
+                 use_global_features=False,
+                 global_embedding_size=50,
+                 ):
+        """
+        Initializes the SKIPBLOCK_BODY.
+
+        Args:
+            embedding_size_gnn (int): Size of the GNN embedding.
+            embedding_size (int): Size of the combined embedding after concatenation.
+            num_skipblocks (int, optional): Number of SKIPblocks to apply. Defaults to 7.
+            pooling_fn (str, optional): Pooling function ('mean', 'max', 'add'). Defaults to 'mean'.
+            use_global_features (bool, optional): Whether to use global features. Defaults to False.
+            global_embedding_size (int, optional): Size of the global embedding.
+        """
         super(SKIPBLOCK_BODY, self).__init__()
         torch.manual_seed(42)
+
+        self.use_global_features = use_global_features
 
         self.pooling_fn = pooling_fn.lower()
         if self.pooling_fn == 'mean':
@@ -28,7 +46,11 @@ class SKIPBLOCK_BODY(BodyLayer):
         else:
             raise ValueError(f"Unsupported pooling function: {pooling_fn}")
 
-        self.bottleneck = nn.Linear(embedding_size_gnn, embedding_size)
+        # If using global features, adjust the bottleneck input size
+        if self.use_global_features:
+            self.bottleneck = nn.Linear(embedding_size_gnn + int(global_embedding_size), embedding_size)
+        else:
+            self.bottleneck = nn.Linear(embedding_size_gnn, embedding_size)
 
         # Create skip blocks
         self.skipblocks = nn.ModuleList([
@@ -36,16 +58,34 @@ class SKIPBLOCK_BODY(BodyLayer):
         ])
         self.relu_out_resnet = nn.LeakyReLU(negative_slope=0.1)
 
-    def forward(self, x, batch):
-        batch_index = batch.batch
-        hidden = self.pool(x, batch_index)
-        hidden = self.bottleneck(hidden)
+    def forward(self, x, batch, global_features=None):
+        """
+        Forward pass for SKIPBLOCK_BODY.
+
+        Args:
+            x (torch.Tensor): GNN output embeddings [num_nodes, embedding_size_gnn].
+            batch (torch.Tensor): Batch indices [num_nodes].
+            global_features (torch.Tensor, optional): Global features [batch_size, global_embedding_size]. Defaults to None.
+
+        Returns:
+            torch.Tensor: Processed embeddings [batch_size, embedding_size].
+        """
+        batch_index = batch
+        graph_emb = self.pool(x, batch_index)  # [batch_size, embedding_size_gnn]
+
+        if self.use_global_features and global_features is not None:
+            combined_emb = torch.cat([graph_emb, global_features], dim=1)  # [batch_size, embedding_size_gnn + global_embedding_size]
+        else:
+            combined_emb = graph_emb  # [batch_size, embedding_size_gnn]
+
+        combined_emb = self.bottleneck(combined_emb)  # [batch_size, embedding_size]
 
         for skipblock in self.skipblocks:
-            hidden = skipblock(hidden)
+            combined_emb = skipblock(combined_emb)
 
-        hidden = self.relu_out_resnet(hidden)
-        return hidden  # Shape: (batch_size, embedding_size)
+        combined_emb = self.relu_out_resnet(combined_emb)  # [batch_size, embedding_size]
+
+        return combined_emb
 
 # Example of above network, but unfolded
 # class BIDIRECTIONAL_BODY(BodyLayer):
