@@ -5,9 +5,10 @@ from torch_geometric.data import Data
 from rdkit import Chem
 from mol2dreams.featurizer.atom_features import AtomFeaturizer
 from mol2dreams.featurizer.bond_features import BondFeaturizer
+from mol2dreams.featurizer.global_features import GlobalFeaturizer
 
 class MoleculeFeaturizer:
-    def __init__(self, atom_config, bond_config, spectrum_embedding_size=1024, extra_features=[]):
+    def __init__(self, atom_config, bond_config, global_config=None, spectrum_embedding_size=1024):
         """
         Initializes the MoleculeFeaturizer with specified configurations.
 
@@ -20,7 +21,11 @@ class MoleculeFeaturizer:
         self.atom_featurizer = AtomFeaturizer(atom_config)
         self.bond_featurizer = BondFeaturizer(bond_config)
         self.spectrum_embedding_size = spectrum_embedding_size
-        self.extra_features = extra_features  # List of extra feature names
+
+        if global_config is not None:
+            self.global_featurizer = GlobalFeaturizer(global_config)
+        else:
+            self.global_featurizer = None
 
     def featurize_molecule(self, mol, embedding=None, extra_attrs=None):
         """
@@ -78,15 +83,13 @@ class MoleculeFeaturizer:
 
         data = Data(x=X, edge_index=edge_index, edge_attr=edge_features, y=y)
 
-        # Add extra attributes as graph-level attributes
-        if extra_attrs:
-            for key, value in extra_attrs.items():
-
-                if isinstance(value, (int, float, np.number)):
-                    data[key] = torch.tensor([[value]], dtype=torch.float)
-                else:
-                    # TODO for categorical value
-                    data[key] = [value]
+        # Add global features as separate attributes if global_featurizer is available
+        if self.global_featurizer and extra_attrs:
+            try:
+                global_features_tensor = self.global_featurizer.featurize(extra_attrs)
+                data["global_features"] = global_features_tensor  # Each key corresponds to a global feature
+            except Exception as e:
+                print(f"Error featurizing global features for molecule: {e}")
 
         return data
 

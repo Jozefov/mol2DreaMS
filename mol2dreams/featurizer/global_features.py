@@ -98,16 +98,10 @@ class GlobalFeaturizer:
             extra_attrs (dict): Dictionary containing global attributes.
 
         Returns:
-            dict: Dictionary of featurized global features as tensors.
-                  Example:
-                  {
-                      'collision_energy': tensor([0, 0, 1, ..., 0]),  # One-hot encoded
-                      'adduct': tensor([1, 0]),  # One-hot encoded
-                      'instrument_type': tensor([0, 1]),  # One-hot encoded
-                      'precursor_mz': tensor([[value]])  # Continuous
-                  }
+            torch.Tensor: Concatenated tensor of all global features.
+                            Shape: [batch_size, num_encoded_features]
         """
-        features = {}
+        feature_list = []
 
         # Process collision_energy as binned categorical
         if self.config.get('collision_energy', False):
@@ -115,16 +109,15 @@ class GlobalFeaturizer:
             value_capped = min(float(value), self.collision_energy_bins[-1])  # Cap at 100
             bin_index = self.bin_collision_energy(value_capped)
             # One-hot encode the bin index
-            collision_energy_one_hot = self.one_hot_encode(bin_index,
-                                                           self.collision_energy_num_bins)  # Shape: [num_bins]
-            features['collision_energy'] = collision_energy_one_hot.unsqueeze(0)  # Shape: [1, num_bins]
+            collision_energy_one_hot = self.one_hot_encode(bin_index, self.collision_energy_num_bins)  # Shape: [num_bins]
+            feature_list.append(collision_energy_one_hot)  # [num_bins]
 
         # Process precursor_mz as continuous (capped)
         if self.config.get('precursor_mz', False):
             value = extra_attrs.get('precursor_mz', 0.0)
             value_capped = min(float(value), PRECURSOR_MZ_MAX)
-            value_tensor = torch.tensor([[value_capped]], dtype=torch.float)  # Shape: [1,1]
-            features['precursor_mz'] = value_tensor  # Uppercase key
+            value_tensor = torch.tensor([value_capped], dtype=torch.float)  # Shape: [1]
+            feature_list.append(value_tensor)  # [1]
 
         # Process categorical features with One-Hot Encoding
         for feature, categories in self.categorical_features.items():
@@ -145,6 +138,13 @@ class GlobalFeaturizer:
             else:
                 num_classes = le.classes_.shape[0]
             one_hot = self.one_hot_encode(encoded, num_classes)  # Shape: [num_classes]
-            features[feature.lower()] = one_hot.unsqueeze(0)  # Shape: [1, num_classes]
+            feature_list.append(one_hot)  # [num_classes]
 
-        return features
+        # Concatenate all features
+        if feature_list:
+            global_features = torch.cat(feature_list, dim=0)  # [num_encoded_features]
+            global_features = global_features.unsqueeze(0)  # Shape: [1, num_encoded_features]
+        else:
+            global_features = torch.tensor([], dtype=torch.float).unsqueeze(0)  # Empty tensor if no features
+
+        return global_features  # Shape: [1, num_encoded_features]
