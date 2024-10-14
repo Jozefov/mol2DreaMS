@@ -106,7 +106,7 @@ class TripletCosineLoss(nn.Module):
         pos_sim = F.cosine_similarity(anchor_norm, positive_norm, dim=1)  # [batch_size]
         neg_sim = F.cosine_similarity(anchor_norm, negative_norm, dim=1)  # [batch_size]
 
-        loss = F.relu(pos_sim - neg_sim + self.margin)
+        loss = F.relu((-pos_sim) - (-neg_sim) + self.margin)
         loss = loss.mean()
 
         return loss

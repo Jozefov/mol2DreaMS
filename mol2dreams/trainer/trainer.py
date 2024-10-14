@@ -446,131 +446,131 @@ class AdversarialTrainer(Trainer):
             if (epoch + 1) % self.save_every == 0:
                 self.save_checkpoint()
 
-    # def validate(self):
-    #     self.model.eval()
-    #     total_loss = 0.0
-    #     total_triplet_loss = 0.0
-    #     total_adv_loss = 0.0
-    #     total_pos_similarity = 0.0
-    #     total_neg_similarity = 0.0
-    #     with torch.no_grad():
-    #         for batch in self.val_loader:
-    #             if batch is None:
-    #                 continue
-    #
-    #             anchor_batch, positive_batch, negative_batch = batch
-    #
-    #             anchor_batch = anchor_batch.to(self.device)
-    #             positive_batch = positive_batch.to(self.device)
-    #             negative_batch = negative_batch.to(self.device)
-    #
-    #             E_M = self.model(anchor_batch)
-    #
-    #             # Compute discriminator output for E_M
-    #             if self.discriminator:
-    #                 D_fake = self.discriminator(E_M)
-    #                 real_labels = torch.ones_like(D_fake)
-    #                 L_adv = self.bce_loss(D_fake, real_labels)
-    #             else:
-    #                 L_adv = torch.tensor(0.0)
-    #
-    #             # Compute triplet loss
-    #             pos_embeddings = self.model(positive_batch).detach()
-    #             neg_embeddings = self.model(negative_batch).detach()
-    #             L_triplet = self.loss_fn(E_M, pos_embeddings, neg_embeddings)
-    #
-    #             # Compute total loss
-    #             total_loss_batch = self.lambda_triplet * L_triplet + self.lambda_adv * L_adv
-    #
-    #             total_loss += total_loss_batch.item()
-    #             total_triplet_loss += L_triplet.item()
-    #             total_adv_loss += L_adv.item()
-    #
-    #             pos_similarities = F.cosine_similarity(E_M, pos_embeddings, dim=1)
-    #             neg_similarities = F.cosine_similarity(E_M, neg_embeddings, dim=1)
-    #             total_pos_similarity += pos_similarities.mean().item()
-    #             total_neg_similarity += neg_similarities.mean().item()
-    #
-    #     avg_loss = total_loss / len(self.val_loader)
-    #     avg_triplet_loss = total_triplet_loss / len(self.val_loader)
-    #     avg_adv_loss = total_adv_loss / len(self.val_loader)
-    #     avg_pos_similarity = total_pos_similarity / len(self.val_loader)
-    #     avg_neg_similarity = total_neg_similarity / len(self.val_loader)
-    #
-    #     self.writer.add_scalar('Loss/val_total', avg_loss, self.epoch)
-    #     self.writer.add_scalar('Loss/val_triplet', avg_triplet_loss, self.epoch)
-    #     self.writer.add_scalar('Loss/val_adv', avg_adv_loss, self.epoch)
-    #     self.writer.add_scalar('CosineSimilarity/pos_val', avg_pos_similarity, self.epoch)
-    #     self.writer.add_scalar('CosineSimilarity/neg_val', avg_neg_similarity, self.epoch)
-    #
-    #     print(f'Validation Loss: {avg_loss:.4f}, Triplet Loss: {avg_triplet_loss:.4f}, '
-    #           f'Adversarial Loss: {avg_adv_loss:.4f}, Pos Sim: {avg_pos_similarity:.4f}, '
-    #           f'Neg Sim: {avg_neg_similarity:.4f}')
-    #     return avg_loss
-    #
-    # def test(self):
-    #     if self.test_loader is None:
-    #         print("Test loader is not provided.")
-    #         return
-    #     self.model.eval()
-    #     total_loss = 0.0
-    #     total_triplet_loss = 0.0
-    #     total_adv_loss = 0.0
-    #     total_pos_similarity = 0.0
-    #     total_neg_similarity = 0.0
-    #     with torch.no_grad():
-    #         for batch in self.test_loader:
-    #             if batch is None:
-    #                 continue
-    #
-    #             anchor_batch, positive_batch, negative_batch = batch
-    #
-    #             anchor_batch = anchor_batch.to(self.device)
-    #             positive_batch = positive_batch.to(self.device)
-    #             negative_batch = negative_batch.to(self.device)
-    #
-    #             E_M = self.model(anchor_batch)
-    #
-    #             # Compute discriminator output for E_M
-    #             if self.discriminator:
-    #                 D_fake = self.discriminator(E_M)
-    #                 real_labels = torch.ones_like(D_fake)
-    #                 L_adv = self.bce_loss(D_fake, real_labels)
-    #             else:
-    #                 L_adv = torch.tensor(0.0)
-    #
-    #             # Compute triplet loss
-    #             pos_embeddings = self.model(positive_batch).detach()
-    #             neg_embeddings = self.model(negative_batch).detach()
-    #             L_triplet = self.loss_fn(E_M, pos_embeddings, neg_embeddings)
-    #
-    #             # Compute total loss
-    #             total_loss_batch = self.lambda_triplet * L_triplet + self.lambda_adv * L_adv
-    #
-    #             total_loss += total_loss_batch.item()
-    #             total_triplet_loss += L_triplet.item()
-    #             total_adv_loss += L_adv.item()
-    #
-    #             pos_similarities = F.cosine_similarity(E_M, pos_embeddings, dim=1)
-    #             neg_similarities = F.cosine_similarity(E_M, neg_embeddings, dim=1)
-    #             total_pos_similarity += pos_similarities.mean().item()
-    #             total_neg_similarity += neg_similarities.mean().item()
-    #
-    #     avg_loss = total_loss / len(self.test_loader)
-    #     avg_triplet_loss = total_triplet_loss / len(self.test_loader)
-    #     avg_adv_loss = total_adv_loss / len(self.test_loader)
-    #     avg_pos_similarity = total_pos_similarity / len(self.test_loader)
-    #     avg_neg_similarity = total_neg_similarity / len(self.test_loader)
-    #
-    #     self.writer.add_scalar('Loss/test_total', avg_loss, self.epoch)
-    #     self.writer.add_scalar('Loss/test_triplet', avg_triplet_loss, self.epoch)
-    #     self.writer.add_scalar('Loss/test_adv', avg_adv_loss, self.epoch)
-    #     self.writer.add_scalar('CosineSimilarity/pos_test', avg_pos_similarity, self.epoch)
-    #     self.writer.add_scalar('CosineSimilarity/neg_test', avg_neg_similarity, self.epoch)
-    #
-    #     print(f'Test Loss: {avg_loss:.4f}, Triplet Loss: {avg_triplet_loss:.4f}, '
-    #           f'Adversarial Loss: {avg_adv_loss:.4f}, Pos Sim: {avg_pos_similarity:.4f}, '
-    #           f'Neg Sim: {avg_neg_similarity:.4f}')
+    def validate(self):
+        self.model.eval()
+        total_loss = 0.0
+        total_triplet_loss = 0.0
+        total_adv_loss = 0.0
+        total_pos_similarity = 0.0
+        total_neg_similarity = 0.0
+        with torch.no_grad():
+            for batch in self.val_loader:
+                if batch is None:
+                    continue
+
+                anchor_batch, positive_batch, negative_batch = batch
+
+                anchor_batch = anchor_batch.to(self.device)
+                positive_batch = positive_batch.to(self.device)
+                negative_batch = negative_batch.to(self.device)
+
+                E_M = self.model(anchor_batch)
+
+                # Compute discriminator output for E_M
+                if self.discriminator:
+                    D_fake = self.discriminator(E_M)
+                    real_labels = torch.ones_like(D_fake)
+                    L_adv = self.bce_loss(D_fake, real_labels)
+                else:
+                    L_adv = torch.tensor(0.0)
+
+                # Compute triplet loss
+                pos_embeddings = self.model(positive_batch).detach()
+                neg_embeddings = self.model(negative_batch).detach()
+                L_triplet = self.loss_fn(E_M, pos_embeddings, neg_embeddings)
+
+                # Compute total loss
+                total_loss_batch = self.lambda_triplet * L_triplet + self.lambda_adv * L_adv
+
+                total_loss += total_loss_batch.item()
+                total_triplet_loss += L_triplet.item()
+                total_adv_loss += L_adv.item()
+
+                pos_similarities = F.cosine_similarity(E_M, pos_embeddings, dim=1)
+                neg_similarities = F.cosine_similarity(E_M, neg_embeddings, dim=1)
+                total_pos_similarity += pos_similarities.mean().item()
+                total_neg_similarity += neg_similarities.mean().item()
+
+        avg_loss = total_loss / len(self.val_loader)
+        avg_triplet_loss = total_triplet_loss / len(self.val_loader)
+        avg_adv_loss = total_adv_loss / len(self.val_loader)
+        avg_pos_similarity = total_pos_similarity / len(self.val_loader)
+        avg_neg_similarity = total_neg_similarity / len(self.val_loader)
+
+        self.writer.add_scalar('Loss/val_total', avg_loss, self.epoch)
+        self.writer.add_scalar('Loss/val_triplet', avg_triplet_loss, self.epoch)
+        self.writer.add_scalar('Loss/val_adv', avg_adv_loss, self.epoch)
+        self.writer.add_scalar('CosineSimilarity/pos_val', avg_pos_similarity, self.epoch)
+        self.writer.add_scalar('CosineSimilarity/neg_val', avg_neg_similarity, self.epoch)
+
+        print(f'Validation Loss: {avg_loss:.4f}, Triplet Loss: {avg_triplet_loss:.4f}, '
+              f'Adversarial Loss: {avg_adv_loss:.4f}, Pos Sim: {avg_pos_similarity:.4f}, '
+              f'Neg Sim: {avg_neg_similarity:.4f}')
+        return avg_loss
+
+    def test(self):
+        if self.test_loader is None:
+            print("Test loader is not provided.")
+            return
+        self.model.eval()
+        total_loss = 0.0
+        total_triplet_loss = 0.0
+        total_adv_loss = 0.0
+        total_pos_similarity = 0.0
+        total_neg_similarity = 0.0
+        with torch.no_grad():
+            for batch in self.test_loader:
+                if batch is None:
+                    continue
+
+                anchor_batch, positive_batch, negative_batch = batch
+
+                anchor_batch = anchor_batch.to(self.device)
+                positive_batch = positive_batch.to(self.device)
+                negative_batch = negative_batch.to(self.device)
+
+                E_M = self.model(anchor_batch)
+
+                # Compute discriminator output for E_M
+                if self.discriminator:
+                    D_fake = self.discriminator(E_M)
+                    real_labels = torch.ones_like(D_fake)
+                    L_adv = self.bce_loss(D_fake, real_labels)
+                else:
+                    L_adv = torch.tensor(0.0)
+
+                # Compute triplet loss
+                pos_embeddings = self.model(positive_batch).detach()
+                neg_embeddings = self.model(negative_batch).detach()
+                L_triplet = self.loss_fn(E_M, pos_embeddings, neg_embeddings)
+
+                # Compute total loss
+                total_loss_batch = self.lambda_triplet * L_triplet + self.lambda_adv * L_adv
+
+                total_loss += total_loss_batch.item()
+                total_triplet_loss += L_triplet.item()
+                total_adv_loss += L_adv.item()
+
+                pos_similarities = F.cosine_similarity(E_M, pos_embeddings, dim=1)
+                neg_similarities = F.cosine_similarity(E_M, neg_embeddings, dim=1)
+                total_pos_similarity += pos_similarities.mean().item()
+                total_neg_similarity += neg_similarities.mean().item()
+
+        avg_loss = total_loss / len(self.test_loader)
+        avg_triplet_loss = total_triplet_loss / len(self.test_loader)
+        avg_adv_loss = total_adv_loss / len(self.test_loader)
+        avg_pos_similarity = total_pos_similarity / len(self.test_loader)
+        avg_neg_similarity = total_neg_similarity / len(self.test_loader)
+
+        self.writer.add_scalar('Loss/test_total', avg_loss, self.epoch)
+        self.writer.add_scalar('Loss/test_triplet', avg_triplet_loss, self.epoch)
+        self.writer.add_scalar('Loss/test_adv', avg_adv_loss, self.epoch)
+        self.writer.add_scalar('CosineSimilarity/pos_test', avg_pos_similarity, self.epoch)
+        self.writer.add_scalar('CosineSimilarity/neg_test', avg_neg_similarity, self.epoch)
+
+        print(f'Test Loss: {avg_loss:.4f}, Triplet Loss: {avg_triplet_loss:.4f}, '
+              f'Adversarial Loss: {avg_adv_loss:.4f}, Pos Sim: {avg_pos_similarity:.4f}, '
+              f'Neg Sim: {avg_neg_similarity:.4f}')
 
 # class ContrastiveTrainer:
 #     def __init__(self, config):
